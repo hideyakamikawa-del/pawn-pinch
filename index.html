@@ -947,7 +947,7 @@ function chooseMove(board, p, level, seen) {
   pieceSel.addEventListener('change', () => { setPieces(pieceSel.value); try { localStorage.setItem('hasami.pieces', pieceSel.value); } catch (e) {} render(); });
   const boardSel = $('boardSel');
   const setBoard = v => { boardEl.dataset.theme = v; boardSel.value = v; };
-  setBoard('marble');
+  setBoard('wood');
   try { const bs = localStorage.getItem('hasami.board'); if (bs === 'wood' || bs === 'checker' || bs === 'marble') setBoard(bs); } catch (e) {}
   boardSel.addEventListener('change', () => { setBoard(boardSel.value); try { localStorage.setItem('hasami.board', boardSel.value); } catch (e) {} });
   $('undo').addEventListener('click', undo);
