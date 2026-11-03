@@ -1,0 +1,975 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>はさみ将棋</title>
+<style>
+:root{
+  --bg:#f3ead6; --ink:#2b2418; --muted:#6f6249; --panel:#fffaf0; --line:#8a6a2f;
+  --board:#e6c27a; --accent:#b3382c; --ok:#2f7d4f; --grid:rgba(70,62,52,.42);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#1d1a14; --ink:#f1e8d3; --muted:#b9ab8c; --panel:#2a251c; --line:#a98b4c;
+    --board:#b98f45; --accent:#e5675a; --ok:#6cc08a;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",Meiryo,"Segoe UI",Roboto,sans-serif;
+  padding:12px 16px calc(24px + env(safe-area-inset-bottom));
+  -webkit-text-size-adjust:100%;
+}
+main{max-width:560px;margin:0 auto}
+.top{position:relative}
+h1{font-size:1.35rem;margin:4px 0 10px;text-align:center;letter-spacing:.06em}
+#lang{position:absolute;right:0;top:0;min-height:34px;padding:4px 8px;font-size:.8rem;max-width:34%}
+.sub{text-align:center;font-size:.8rem;color:var(--muted);letter-spacing:.22em;margin:-6px 0 10px;text-transform:uppercase}
+.sub:empty{display:none}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;margin-bottom:10px}
+.controls label{font-size:.85rem;color:var(--muted);display:flex;align-items:center;gap:4px}
+select,button.btn{
+  font:inherit;font-size:.95rem;padding:7px 10px;border-radius:8px;
+  border:1px solid var(--line);background:var(--panel);color:var(--ink);min-height:40px;
+}
+button.btn{cursor:pointer}
+button.btn:active{transform:translateY(1px)}
+button.btn:disabled{opacity:.45;cursor:default}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.side{display:flex;justify-content:space-between;align-items:center;font-size:.95rem;padding:4px 2px}
+.side b{font-size:1.15rem}
+.who{display:flex;align-items:center;gap:6px}
+.ico{width:22px;height:22px;display:block}
+.status{text-align:center;min-height:5.6em;margin:6px 0;font-weight:600}
+.status.think{color:var(--muted)}
+.boardwrap{position:relative}
+#board{
+  width:100%;aspect-ratio:1/1;display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(9,1fr);
+  /* 大理石の盤面: 上から光沢 → 石目(SVGノイズ) → 地色 */
+  background-color:#cfc9bd;
+  background-image:
+    linear-gradient(135deg,rgba(255,255,255,.38) 0%,rgba(255,255,255,0) 38%,rgba(255,255,255,.14) 62%,rgba(255,255,255,0) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='800'%3E%3Cfilter id='m' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.0045 0.0075' numOctaves='4' seed='9' result='t'/%3E%3CfeColorMatrix in='t' type='matrix' values='1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0 0 1' result='tg'/%3E%3CfeComponentTransfer in='tg' result='v'%3E%3CfeFuncR type='table' tableValues='.50 .92 .96 .96 .96 .96 .96 .96 .96 .96'/%3E%3CfeFuncG type='table' tableValues='.50 .92 .96 .96 .96 .96 .96 .96 .96 .96'/%3E%3CfeFuncB type='table' tableValues='.50 .92 .96 .96 .96 .96 .96 .96 .96 .96'/%3E%3C/feComponentTransfer%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.004' numOctaves='3' seed='2' result='c'/%3E%3CfeColorMatrix in='c' type='matrix' values='.4 0 0 0 .60 .4 0 0 0 .60 .4 0 0 0 .60 0 0 0 0 1' result='cl'/%3E%3CfeBlend in='v' in2='cl' mode='multiply' result='b'/%3E%3CfeColorMatrix in='b' type='matrix' values='1 0 0 0 0 0 .985 0 0 0 0 0 .95 0 0 0 0 0 0 1'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url%28%23m%29'/%3E%3C/svg%3E");
+  background-size:100% 100%,cover;
+  border:5px solid #8d887d;border-radius:4px;
+  box-shadow:0 3px 12px rgba(0,0,0,.35),inset 0 0 0 1px rgba(255,255,255,.5);touch-action:manipulation;user-select:none;-webkit-user-select:none;
+}
+/* 盤面テーマ */
+#board[data-theme="wood"]{
+  --grid:rgba(55,32,10,.62);
+  background-color:#dcb468;
+  background-image:linear-gradient(135deg,rgba(255,255,255,.2),rgba(255,255,255,0) 45%),url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='800'%3E%3Cfilter id='w' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012 0.22' numOctaves='4' seed='4' result='n'/%3E%3CfeColorMatrix in='n' type='matrix' values='1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0 0 1' result='g'/%3E%3CfeComponentTransfer in='g'%3E%3CfeFuncR type='table' tableValues='.93 .86 .80 .90 .84 .78 .88 .83'/%3E%3CfeFuncG type='table' tableValues='.74 .66 .60 .70 .63 .57 .68 .62'/%3E%3CfeFuncB type='table' tableValues='.42 .34 .28 .38 .31 .26 .36 .30'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url%28%23w%29'/%3E%3C/svg%3E");
+  background-size:100% 100%,cover;
+  border-color:#6d4a1c;
+}
+#board[data-theme="checker"]{
+  --grid:transparent;
+  background-color:#f0e6cc;
+  background-image:repeating-conic-gradient(#f0e6cc 0% 25%,#b58863 0% 50%);
+  background-size:22.2222% 22.2222%;
+  border-color:#6b4a30;
+}
+.demobar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;margin:0 0 8px;padding:8px;background:var(--panel);border:1px solid var(--line);border-radius:10px;font-size:.85rem}
+.demobar[hidden]{display:none}
+.demobar #demoInfo{font-weight:600;width:100%;text-align:center}
+.demobar label{display:flex;align-items:center;gap:4px;color:var(--muted)}
+.cell{
+  position:relative;padding:0;margin:0;border:0;background:transparent;cursor:pointer;
+  border-right:1px solid var(--grid);border-bottom:1px solid var(--grid);
+  -webkit-tap-highlight-color:transparent;
+}
+.cell:nth-child(9n){border-right:0}
+.cell:nth-child(n+73){border-bottom:0}
+.cell.last{background:rgba(255,255,255,.28)}
+.cell.sel{background:rgba(47,125,79,.38)}
+.cell.tgt::after{
+  content:"";position:absolute;left:50%;top:50%;width:26%;height:26%;transform:translate(-50%,-50%);
+  border-radius:50%;background:rgba(47,125,79,.75);
+}
+/* 駒: チェスのポーン風。白(あなた) / 黒(コンピュータ) */
+.pw.h,.ico.h,.mini.on.h{--pf:#fbf4e2;--ps:#3a2e18}
+.pw.c,.ico.c,.mini.on.c{--pf:#35353d;--ps:#0f0f12}
+.pw{position:absolute;inset:6%;filter:drop-shadow(0 2px 1.5px rgba(0,0,0,.4))}
+.pw svg,.ico svg,.mini svg{width:100%;height:100%;display:block}
+.ico{--pf:#fbf4e2;--ps:#3a2e18}
+.pw.ghost{--pf:#ffb3a8;--ps:#8a2a20}
+.pw.ghost.win{--pf:#b6efc6;--ps:#1f7a3d}
+.mini{--tx:rgba(120,100,60,.3)}
+/* 駒の形: 象棋(中国) / チャンギ(韓国) */
+[data-pieces="xq"] .pw.h,[data-pieces="xq"] .ico.h,[data-pieces="xq"] .mini.on.h{--pf:#f6e3b4;--ps:#b3261b;--tx:#b3261b}
+[data-pieces="xq"] .pw.c,[data-pieces="xq"] .ico.c,[data-pieces="xq"] .mini.on.c{--pf:#f6e3b4;--ps:#1c1c1c;--tx:#1c1c1c}
+[data-pieces="jg"] .pw.h,[data-pieces="jg"] .ico.h,[data-pieces="jg"] .mini.on.h{--pf:#f1deb0;--ps:#1f7a4a;--tx:#1f7a4a}
+[data-pieces="jg"] .pw.c,[data-pieces="jg"] .ico.c,[data-pieces="jg"] .mini.on.c{--pf:#f1deb0;--ps:#b3261b;--tx:#b3261b}
+[data-pieces="sg"] .pw.h,[data-pieces="sg"] .ico.h,[data-pieces="sg"] .mini.on.h{--pf:#f7e3b0;--ps:#5a3d12;--tx:#1c1608}
+[data-pieces="sg"] .pw.c,[data-pieces="sg"] .ico.c,[data-pieces="sg"] .mini.on.c{--pf:#f7e3b0;--ps:#5a3d12;--tx:#a3231a}
+[data-pieces] .pw.ghost{--pf:#ffb3a8;--ps:#8a2a20;--tx:#8a2a20}
+[data-pieces] .pw.ghost.win{--pf:#b6efc6;--ps:#1f7a3d;--tx:#1f7a3d}
+.ghost{position:absolute;inset:6%;pointer-events:none;z-index:2;animation:fade 2.2s ease-out forwards}
+.ghost::after{
+  content:"\2715";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  color:#c01f10;font-size:clamp(22px,9vw,46px);font-weight:900;text-shadow:0 0 3px #fff,0 0 6px #fff;
+}
+@keyframes fade{0%{opacity:1;transform:scale(1.15)}60%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.3)}}
+/* 自分が取ったとき: 緑のチェック */
+.ghost.win{animation:winfade 2.2s ease-out forwards}
+.ghost.win::after{content:"\2714";color:#1f9d4d;font-size:clamp(26px,10vw,52px);text-shadow:0 0 4px #fff,0 0 10px #7be39d,0 0 16px #7be39d;animation:starpop 1s ease-out}
+@keyframes winfade{0%{opacity:1;transform:scale(1.2)}60%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-40%) scale(.5)}}
+@keyframes starpop{0%{transform:scale(.3) rotate(-60deg)}60%{transform:scale(1.5) rotate(15deg)}100%{transform:scale(1) rotate(0)}}
+.cell.flash{animation:flash 2.2s ease-out}
+@keyframes flash{0%,60%{background:rgba(220,50,30,.55)}100%{background:transparent}}
+.cell.flashwin{animation:flashwin 2.2s ease-out}
+@keyframes flashwin{0%,50%{background:rgba(47,170,90,.55)}100%{background:transparent}}
+.cell.lastto{box-shadow:inset 0 0 0 3px var(--accent)}
+.tray{display:flex;align-items:center;gap:8px;min-height:36px;padding:2px 2px;font-size:.8rem;color:var(--muted)}
+.tray .tl{white-space:nowrap}
+.tray #trayMine,.tray #trayLost{display:flex;gap:3px;flex-wrap:nowrap;align-items:center}
+.mini{--ms:clamp(22px,7.2vw,30px);width:var(--ms);height:var(--ms);flex:none;--pf:rgba(120,100,60,.14);--ps:rgba(120,100,60,.3);display:block}
+.mini.pop{animation:pop .5s ease-out}
+@keyframes pop{0%{transform:scale(1.8)}100%{transform:scale(1)}}
+.legend{font-size:.75rem;color:var(--muted);text-align:center;margin:-2px 0 6px;line-height:1.6}
+.legend.off{display:none}
+.legend .dot{display:inline-block;width:.8em;height:.8em;border-radius:50%;vertical-align:-1px;margin:0 2px 0 4px}
+.legend .g{background:rgba(47,125,79,.85)}.legend .o{background:#f08a00}
+.legend .r{background:#1f9d4d;color:#fff;width:1.25em;height:1.25em;font-size:.7rem;line-height:1.25em;text-align:center;vertical-align:-3px}
+.legend .r::after{content:"\2714"}
+.legend .warn{color:#d27200;font-weight:700}
+.cell.tgt.cap::after{width:50%;height:50%;background:#1f9d4d;color:#fff;display:flex;align-items:center;justify-content:center;font-size:clamp(12px,4vw,18px);font-weight:700;content:"\2714"}
+.cell.tgt.risk::after{background:#f08a00}
+.cell.tgt.cap.risk::after{background:#1f9d4d;box-shadow:0 0 0 3px #f08a00}
+.cell.threat{box-shadow:inset 0 0 0 3px #f08a00;background:rgba(240,138,0,.22)}
+.cell.hfrom{box-shadow:inset 0 0 0 3px #1f6fe0;background:rgba(31,111,224,.2)}
+.cell.hto{box-shadow:inset 0 0 0 3px #1f6fe0;background:rgba(31,111,224,.2)}
+.cell.hto::before{content:"\2605";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#1f6fe0;font-size:clamp(16px,6vw,28px);z-index:3}
+.note{min-height:1.5em;font-size:1.05rem}
+.note.good{color:var(--ok)}
+.note.bad{color:var(--accent)}
+.overlay{
+  position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.45);border-radius:4px;z-index:5;
+}
+.overlay.show{display:flex}
+.result{background:var(--panel);padding:20px 24px;border-radius:12px;text-align:center;max-width:80%}
+.result h2{margin:0 0 6px;font-size:1.4rem}
+.result p{margin:0 0 14px;color:var(--muted);font-size:.9rem}
+.result .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+details{margin-top:16px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:.9rem;line-height:1.7}
+summary{cursor:pointer;font-weight:600}
+details ul{margin:6px 0 0;padding-left:1.2em}
+footer{margin-top:14px;text-align:center;font-size:.75rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="pawn" viewBox="0 0 100 100">
+      <g style="fill:var(--pf);stroke:var(--ps);stroke-width:3.5;stroke-linejoin:round">
+        <circle cx="50" cy="27" r="15"/>
+        <rect x="33" y="43" width="34" height="9" rx="4.5"/>
+        <path d="M39 52 C39 63 36 71 29 81 L71 81 C64 71 61 63 61 52 Z"/>
+        <rect x="22" y="81" width="56" height="12" rx="6"/>
+      </g>
+    </symbol>
+    <symbol id="xqH" viewBox="0 0 100 100"><g style="fill:var(--pf);stroke:var(--ps);stroke-width:4;stroke-linejoin:round"><circle cx="50" cy="50" r="43"/><circle cx="50" cy="50" r="35" style="fill:none;stroke-width:2.5"/></g><text x="50" y="50" dy=".38em" text-anchor="middle" style="fill:var(--tx);font-size:44px;font-weight:700;font-family:KaiTi,'Kaiti SC',STKaiti,'Hiragino Mincho ProN','Noto Serif CJK SC',serif">兵</text></symbol>
+    <symbol id="xqC" viewBox="0 0 100 100"><g style="fill:var(--pf);stroke:var(--ps);stroke-width:4;stroke-linejoin:round"><circle cx="50" cy="50" r="43"/><circle cx="50" cy="50" r="35" style="fill:none;stroke-width:2.5"/></g><text x="50" y="50" dy=".38em" text-anchor="middle" style="fill:var(--tx);font-size:44px;font-weight:700;font-family:KaiTi,'Kaiti SC',STKaiti,'Hiragino Mincho ProN','Noto Serif CJK SC',serif">卒</text></symbol>
+    <symbol id="jgH" viewBox="0 0 100 100"><g style="fill:var(--pf);stroke:var(--ps);stroke-width:4;stroke-linejoin:round"><polygon points="31,7 69,7 93,31 93,69 69,93 31,93 7,69 7,31"/><polygon points="33,16 67,16 84,33 84,67 67,84 33,84 16,67 16,33" style="fill:none;stroke-width:2.5"/></g><text x="50" y="50" dy=".38em" text-anchor="middle" style="fill:var(--tx);font-size:44px;font-weight:700;font-family:'Hiragino Mincho ProN','Yu Mincho','Noto Serif CJK KR',serif">卒</text></symbol>
+    <symbol id="jgC" viewBox="0 0 100 100"><g style="fill:var(--pf);stroke:var(--ps);stroke-width:4;stroke-linejoin:round"><polygon points="31,7 69,7 93,31 93,69 69,93 31,93 7,69 7,31"/><polygon points="33,16 67,16 84,33 84,67 67,84 33,84 16,67 16,33" style="fill:none;stroke-width:2.5"/></g><text x="50" y="50" dy=".38em" text-anchor="middle" style="fill:var(--tx);font-size:44px;font-weight:700;font-family:'Hiragino Mincho ProN','Yu Mincho','Noto Serif CJK KR',serif">兵</text></symbol>
+    <symbol id="sgH" viewBox="0 0 100 100"><g style="fill:var(--pf);stroke:var(--ps);stroke-width:3.5;stroke-linejoin:round"><polygon points="50,5 88,21 96,95 4,95 12,21"/></g><text x="50" y="58" dy=".38em" text-anchor="middle" style="fill:var(--tx);font-size:46px;font-weight:700;font-family:'Hiragino Mincho ProN','Yu Mincho','Noto Serif JP',serif">歩</text></symbol>
+    <symbol id="sgC" viewBox="0 0 100 100"><g transform="rotate(180 50 50)"><g style="fill:var(--pf);stroke:var(--ps);stroke-width:3.5;stroke-linejoin:round"><polygon points="50,5 88,21 96,95 4,95 12,21"/></g><text x="50" y="58" dy=".38em" text-anchor="middle" style="fill:var(--tx);font-size:46px;font-weight:700;font-family:'Hiragino Mincho ProN','Yu Mincho','Noto Serif JP',serif">と</text></g></symbol>
+  </defs>
+</svg>
+<main>
+  <div class="top">
+    <h1 data-i18n="title">はさみ将棋</h1>
+    <div class="sub" data-i18n="sub"></div>
+    <select id="lang" aria-label="Language">
+      <option value="ja">日本語</option>
+      <option value="en">English</option>
+      <option value="zh">简体中文</option>
+      <option value="ko">한국어</option>
+      <option value="es">Español</option>
+      <option value="fr">Français</option>
+      <option value="de">Deutsch</option>
+    </select>
+  </div>
+
+  <div class="controls">
+    <label><span data-i18n="level">強さ</span>
+      <select id="level"></select>
+    </label>
+    <label><span data-i18n="turn">手番</span>
+      <select id="side">
+        <option value="first" data-i18n="first">先手(あなたから)</option>
+        <option value="second" data-i18n="second">後手</option>
+      </select>
+    </label>
+    <button class="btn primary" id="newgame" type="button" data-i18n="newgame">新しい対局</button>
+    <button class="btn" id="undo" type="button" data-i18n="undo">1手戻す</button>
+    <button class="btn" id="hint" type="button" data-i18n="hint">ヒント</button>
+    <label><input type="checkbox" id="assist" checked> <span data-i18n="assist">アシスト</span></label>
+    <label><input type="checkbox" id="corner" checked> <span data-i18n="corner">角取りあり</span></label>
+    <label><span data-i18n="board">盤面</span>
+      <select id="boardSel">
+        <option value="marble" data-i18n="bMarble">大理石</option>
+        <option value="wood" data-i18n="bWood">将棋盤(木目)</option>
+        <option value="checker" data-i18n="bChecker">チェス盤風</option>
+      </select>
+    </label>
+    <label><span data-i18n="pstyle">駒の形</span>
+      <select id="pieceSel">
+        <option value="pawn" data-i18n="pPawn">ポーン(チェス風)</option>
+        <option value="sg" data-i18n="pSg">日本の将棋(歩)</option>
+        <option value="xq" data-i18n="pXq">中国将棋(象棋)</option>
+        <option value="jg" data-i18n="pJg">韓国将棋(チャンギ)</option>
+      </select>
+    </label>
+    <button class="btn" id="demoBtn" type="button" data-i18n="demo">デモ観戦</button>
+  </div>
+  <div class="demobar" id="demobar" hidden>
+    <div id="demoInfo"></div>
+    <button class="btn" id="demoPause" type="button" data-i18n="demoPause">一時停止</button>
+    <button class="btn" id="demoNextBtn" type="button" data-i18n="demoNext">次のデモ</button>
+    <label><span data-i18n="speed">速さ</span>
+      <select id="speedSel">
+        <option value="1500" data-i18n="spSlow">ゆっくり</option>
+        <option value="800" data-i18n="spNormal" selected>ふつう</option>
+        <option value="250" data-i18n="spFast">はやい</option>
+      </select>
+    </label>
+    <button class="btn" id="demoStop" type="button" data-i18n="demoStop">デモをやめる</button>
+  </div>
+  <div class="legend" id="legend" data-i18n-html="legend"></div>
+
+  <div class="side">
+    <span class="who"><svg class="ico c" id="icoCpu" aria-hidden="true"><use href="#pawn"/></svg><span data-i18n="cpu" id="whoCpu">コンピュータ</span></span>
+    <span><span data-i18n="pieces">駒</span> <b id="cntCpu">9</b></span>
+  </div>
+  <div class="tray"><span class="tl" id="trayMineL" data-i18n="trayMine">あなたが取った駒</span><span id="trayMine"></span></div>
+  <div class="boardwrap">
+    <div id="board" role="grid" aria-label="Hasami Shogi board"></div>
+    <div class="overlay" id="overlay">
+      <div class="result">
+        <h2 id="resTitle"></h2>
+        <p id="resSub"></p>
+        <div class="row">
+          <button class="btn primary" id="again" type="button" data-i18n="again">もう一度</button>
+          <button class="btn" id="back" type="button" data-i18n="undo">1手戻す</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="side">
+    <span class="who"><svg class="ico h" id="icoMe" aria-hidden="true"><use href="#pawn"/></svg><span data-i18n="me" id="whoMe">あなた</span></span>
+    <span><span data-i18n="pieces">駒</span> <b id="cntMe">9</b></span>
+  </div>
+  <div class="tray"><span class="tl" id="trayLostL" data-i18n="trayLost">取られた駒</span><span id="trayLost"></span></div>
+  <div class="status" id="status" aria-live="polite"></div>
+
+  <details>
+    <summary data-i18n="rulesTitle">ルール</summary>
+    <ul id="rulesList"></ul>
+  </details>
+  <footer data-i18n="footer">操作:自分の駒をタップ → 緑の点をタップ</footer>
+</main>
+
+<script>
+// ==ENGINE==
+const HUMAN = 1, CPU = 2, WIN = 100000, TIMEOUT = {};
+const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+// [角のマス, となり1, となり2]
+const CORNERS = [[0, 1, 9], [8, 7, 17], [72, 63, 73], [80, 79, 71]];
+const MAX_PLIES = 400;
+const STALL = 60, STALL0 = 120; // 駒取りが止まってから終了までの手数(まだ一度も取っていないときは STALL0)
+let cornerRule = true; // 角取りを認めるか
+
+// 強さ: d=最大の読みの深さ, t=制限時間(ms), eps=わざと適当に指す確率
+const LV = [null,
+  { d: 0, eps: 1 },
+  { d: 1, eps: 0.5, att: 6 },
+  { d: 1, eps: 0.2, att: 6 },
+  { d: 1, eps: 0, att: 6 },
+  { d: 2, eps: 0.25 },
+  { d: 2, eps: 0 },
+  { d: 4, t: 800, eps: 0.05 },
+  { d: 4, t: 1500, eps: 0 },
+  { d: 6, t: 2500, eps: 0 },
+  { d: 6, t: 4000, eps: 0 }
+];
+
+function newBoard() {
+  const b = new Int8Array(81);
+  for (let c = 0; c < 9; c++) { b[c] = CPU; b[72 + c] = HUMAN; }
+  return b;
+}
+function inB(r, c) { return r >= 0 && r < 9 && c >= 0 && c < 9; }
+function countOf(b) {
+  const cnt = [0, 0, 0];
+  for (let i = 0; i < 81; i++) if (b[i]) cnt[b[i]]++;
+  return cnt;
+}
+function targetsOf(b, i) {
+  const out = [], r = (i / 9) | 0, c = i % 9;
+  for (const [dr, dc] of DIRS) {
+    let rr = r + dr, cc = c + dc;
+    while (inB(rr, cc) && b[rr * 9 + cc] === 0) { out.push(rr * 9 + cc); rr += dr; cc += dc; }
+  }
+  return out;
+}
+function genMoves(b, p) {
+  const out = [];
+  for (let i = 0; i < 81; i++) {
+    if (b[i] !== p) continue;
+    for (const t of targetsOf(b, i)) out.push(i * 81 + t);
+  }
+  return out;
+}
+// 駒を動かし、取った駒の位置の配列を返す
+function applyMove(b, cnt, p, from, to) {
+  b[from] = 0; b[to] = p;
+  const q = 3 - p, cap = [], r = (to / 9) | 0, c = to % 9;
+  for (const [dr, dc] of DIRS) {
+    let rr = r + dr, cc = c + dc;
+    const tmp = [];
+    while (inB(rr, cc) && b[rr * 9 + cc] === q) { tmp.push(rr * 9 + cc); rr += dr; cc += dc; }
+    if (tmp.length && inB(rr, cc) && b[rr * 9 + cc] === p) for (const i of tmp) cap.push(i);
+  }
+  if (cornerRule) for (const [k, n1, n2] of CORNERS) {
+    if (b[k] === q && b[n1] === p && b[n2] === p && (to === n1 || to === n2)) cap.push(k);
+  }
+  for (const i of cap) b[i] = 0;
+  cnt[q] -= cap.length;
+  return cap;
+}
+function undoMove(b, cnt, p, from, to, cap) {
+  b[to] = 0; b[from] = p;
+  const q = 3 - p;
+  for (const i of cap) b[i] = q;
+  cnt[q] += cap.length;
+}
+
+// 局面の識別子(次に指す側 p を含む)。同形反復の検出と、エンジンの繰り返し回避に使う
+function posKey(b, p) { return b.join('') + p; }
+
+let nodes = 0, deadline = Infinity;
+let ATT = 0, ADVW = 1.0; // 攻めの形の加点(レベル別に chooseMove で設定) / 前進の加点
+function evaluate(b, cnt, p) {
+  let s = (cnt[p] - cnt[3 - p]) * 100;
+  for (let i = 0; i < 81; i++) {
+    const v = b[i];
+    if (!v) continue;
+    const r = (i / 9) | 0, c = i % 9;
+    const adv = v === HUMAN ? 8 - r : r;
+    const val = adv * ADVW + (4 - Math.abs(c - 4)) * 0.5;
+    s += v === p ? val : -val;
+    // 攻めの形: 相手の駒の片側に自駒がいて、反対側が空いている(あと1手ではさめる形)を加点
+    const w = 3 - v;
+    let pins = 0;
+    if (c > 0 && c < 8) { const l = b[i - 1], rt = b[i + 1]; if ((l === w && rt === 0) || (rt === w && l === 0)) pins++; }
+    if (r > 0 && r < 8) { const u = b[i - 9], dn = b[i + 9]; if ((u === w && dn === 0) || (dn === w && u === 0)) pins++; }
+    if (pins) s += (w === p ? ATT : -ATT) * pins;
+  }
+  return s;
+}
+function orderMoves(b, cnt, p, mv) {
+  const sc = mv.map(m => {
+    const from = (m / 81) | 0, to = m % 81;
+    const cap = applyMove(b, cnt, p, from, to);
+    const n = cap.length;
+    undoMove(b, cnt, p, from, to, cap);
+    return [n, m];
+  });
+  sc.sort((x, y) => y[0] - x[0]);
+  return sc.map(x => x[1]);
+}
+function negamax(b, cnt, p, depth, alpha, beta, ply) {
+  if ((++nodes & 2047) === 0 && Date.now() > deadline) throw TIMEOUT;
+  const q = 3 - p;
+  if (cnt[p] <= 1) return -(WIN - ply);
+  if (cnt[q] <= 1) return WIN - ply;
+  if (depth === 0) return evaluate(b, cnt, p);
+  const mv = genMoves(b, p);
+  if (!mv.length) return -(WIN - ply);
+  let best = -Infinity;
+  for (const m of orderMoves(b, cnt, p, mv)) {
+    const from = (m / 81) | 0, to = m % 81;
+    const cap = applyMove(b, cnt, p, from, to);
+    const s = -negamax(b, cnt, q, depth - 1, -beta, -alpha, ply + 1);
+    undoMove(b, cnt, p, from, to, cap);
+    if (s > best) best = s;
+    if (best > alpha) alpha = best;
+    if (alpha >= beta) break;
+  }
+  return best;
+}
+function rootSearch(b, cnt, p, moves, d, seen) {
+  const q = 3 - p;
+  let alpha = -Infinity, bestM = moves[0], bestS = -Infinity;
+  for (const m of moves) {
+    const from = (m / 81) | 0, to = m % 81;
+    const cap = applyMove(b, cnt, p, from, to);
+    // 過去に出た局面に戻る手は減点する(3回目になる手は大きく減点)。勝ち確定の手は減点しない
+    let pen = 0;
+    if (seen && cnt[q] > 1) { const n = seen[posKey(b, q)] || 0; if (n) pen = n >= 2 ? 150 : 40; }
+    let s = -negamax(b, cnt, q, d - 1, -Infinity, -(alpha + pen), 1);
+    undoMove(b, cnt, p, from, to, cap);
+    if (pen && s < WIN - 1000) s -= pen;
+    if (s > bestS) { bestS = s; bestM = m; }
+    if (bestS > alpha) alpha = bestS;
+  }
+  return { move: bestM, score: bestS };
+}
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = (Math.random() * (i + 1)) | 0;
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+// p の手を選ぶ。戻り値は from*81+to、手がなければ null
+function chooseMove(board, p, level, seen) {
+  const cfg = LV[level];
+  ATT = cfg.att || 0;
+  const all = genMoves(board, p);
+  if (!all.length) return null;
+  if (cfg.d === 0 || Math.random() < cfg.eps) return all[(Math.random() * all.length) | 0];
+  shuffle(all);
+  const cnt0 = countOf(board);
+  let moves = orderMoves(Int8Array.from(board), cnt0.slice(), p, all);
+  nodes = 0;
+  deadline = cfg.t ? Date.now() + cfg.t : Infinity;
+  let any = null, even = null;
+  for (let d = 1; d <= cfg.d; d++) {
+    const b = Int8Array.from(board), cnt = cnt0.slice();
+    let res;
+    try { res = rootSearch(b, cnt, p, moves, d, seen); }
+    catch (e) { if (e !== TIMEOUT) throw e; break; }
+    any = res;
+    if (d % 2 === 0) even = res;
+    moves = [res.move].concat(moves.filter(m => m !== res.move));
+    if (res.score >= WIN - 1000) break;
+  }
+  const pick = even || any;
+  return pick ? pick.move : moves[0];
+}
+// ==/ENGINE==
+
+// ==UI==
+(function () {
+  if (typeof document === 'undefined') return;
+  const $ = id => document.getElementById(id);
+  const boardEl = $('board'), statusEl = $('status');
+  const levelEl = $('level'), sideEl = $('side');
+  const cells = [];
+  let board, cnt, turn, over, history, last, selected, thinking, plies, result, noteMe, noteCpu;
+  const flashUntil = {}, flashWin = {};
+  const trayPrev = { got: 0, lost: 0 };
+  const assistEl = $('assist');
+  let hint = null, hintBusy = false;
+  let seen = {}; // 局面ごとの出現回数(同形反復の検出用)
+  let lastCapPly = 0; // 最後に駒を取った手数(0=まだ取っていない)
+  LV[11] = { d: 4, t: 1000, eps: 0 }; // ヒント専用(選択肢には出さない)
+  // デモ観戦用(Lv7〜9相当。見ていて待たされないよう時間を短めに)
+  LV[21] = { d: 4, t: 600, eps: 0.03 }; LV[22] = { d: 4, t: 900, eps: 0 }; LV[23] = { d: 6, t: 1200, eps: 0 };
+  const DEMO_MAX = 160;
+  let demo = false, demoPaused = false, demoSpeed = 800, aiTimer = null, openRand = 0;
+  const demoLv = { 1: 22, 2: 22 };
+  const lvShow = k => k - 14;
+
+  // ---------- 多言語 ----------
+  const I18N = {
+    ja: {
+      title: 'はさみ将棋', sub: '', level: '強さ', turn: '手番', first: '先手(あなたから)', second: '後手',
+      newgame: '新しい対局', undo: '1手戻す', hint: 'ヒント', hintBusy: '考え中…', assist: 'アシスト', corner: '角取りあり',
+      legend: 'アシスト:<span class="dot g"></span>安全 <span class="dot r"></span>取れる <span class="dot o"></span>新たに取られる <span class="warn">橙の枠</span>=今取られる駒',
+      cpu: 'コンピュータ', me: 'あなた', pieces: '駒', trayMine: 'あなたが取った駒', trayLost: '取られた駒',
+      yourTurn: 'あなたの番です', thinking: 'コンピュータが考え中…', over: '対局終了',
+      meCap: n => '✓ あなたの手:' + n + '枚取りました!', meNone: 'あなたの手:取れませんでした',
+      cpuCap: n => '✕ コンピュータの手:' + n + '枚取られました…', cpuNone: 'コンピュータの手:取られていません',
+      win: 'あなたの勝ち!', lose: 'コンピュータの勝ち', draw: '引き分け',
+      subCaptured: '相手の駒を残り1枚以下にしました。', subLost: '駒が残り1枚以下になりました。',
+      subBlocked: '相手は動かせる駒がありません。', subBlockedMe: 'あなたは動かせる駒がありません。',
+      subCapDraw: MAX_PLIES + '手に達し、駒数が同じでした。', subCapCount: MAX_PLIES + '手に達し、駒数で決まりました。',
+      again: 'もう一度', rulesTitle: 'ルール',
+      rules: [
+        'あなたは下側の白い駒、コンピュータは上側の黒い駒です。9×9の盤に、9枚ずつ並べて始めます。',
+        '駒は縦か横に、空いているところまで好きなだけ動かせます。他の駒は飛び越えられません。',
+        '相手の駒を、縦または横に自分の駒2枚ではさむと取れます。連続して並んだ相手の駒を、まとめてはさんでも取れます。',
+        '自分から相手の駒の間に入っても、取られません。',
+        '盤の角にいる駒は、角のとなり2か所を自分の駒でふさぐと取れます(「角取りあり」のチェックで切り替えられます。外すと、角の駒は取られません)。',
+        '相手の駒を残り1枚以下にしたら勝ちです。動かせる駒がなくなったら負けです。',
+        MAX_PLIES + '手に達したら、駒が多い方の勝ちです(同数は引き分け)。'
+      ],
+      footer: '操作:自分の駒をタップ → 緑の点をタップ',
+      lvl: i => 'レベル' + i + '(' + ['', '入門', 'やさしい', 'やさしい', 'ふつう弱', 'ふつう', 'ふつう', 'つよい', 'つよい', 'とても強い', '最強'][i] + ')',
+      langBtn: 'English'
+    },
+    en: {
+      title: 'Pawn Pinch', sub: 'Hasami Shogi', level: 'Level', turn: 'Turn', first: 'You go first', second: 'You go second',
+      newgame: 'New game', undo: 'Undo', hint: 'Hint', hintBusy: 'Thinking…', assist: 'Assist', corner: 'Corner capture',
+      legend: 'Assist: <span class="dot g"></span>safe <span class="dot r"></span>capture <span class="dot o"></span>new danger <span class="warn">Orange frame</span> = can be captured now',
+      cpu: 'Computer', me: 'You', pieces: 'Pieces', trayMine: 'Captured by you', trayLost: 'Your lost pieces',
+      yourTurn: 'Your turn', thinking: 'Computer is thinking…', over: 'Game over',
+      meCap: n => '✓ Your move: captured ' + n + '!', meNone: 'Your move: no capture',
+      cpuCap: n => '✕ Computer’s move: you lost ' + n, cpuNone: 'Computer’s move: no capture',
+      win: 'You win!', lose: 'Computer wins', draw: 'Draw',
+      subCaptured: 'The computer is down to one piece or fewer.', subLost: 'You are down to one piece or fewer.',
+      subBlocked: 'The computer has no legal move.', subBlockedMe: 'You have no legal move.',
+      subCapDraw: MAX_PLIES + ' moves reached with equal pieces.', subCapCount: MAX_PLIES + ' moves reached; decided by piece count.',
+      again: 'Play again', rulesTitle: 'Rules',
+      rules: [
+        'You play the white pawns at the bottom; the computer plays the black pawns at the top. Each side starts with 9 pieces on a 9×9 board.',
+        'A piece moves in a straight line, horizontally or vertically, any number of empty squares. It cannot jump over other pieces.',
+        'Sandwich an enemy piece between two of your pieces, in a row or a column, to capture it. A line of several enemy pieces can be captured at once.',
+        'Moving a piece between two enemy pieces is safe; you are not captured.',
+        'A piece in a corner is captured when you occupy both squares next to the corner. You can turn this off with the “Corner capture” checkbox.',
+        'Reduce your opponent to one piece or fewer to win. If you have no legal move, you lose.',
+        'After ' + MAX_PLIES + ' moves, the player with more pieces wins (equal = draw).'
+      ],
+      footer: 'Tap your piece, then tap a green dot.',
+      lvl: i => 'Level ' + i + ' (' + ['', 'Beginner', 'Easy', 'Easy+', 'Casual', 'Normal', 'Normal+', 'Strong', 'Stronger', 'Expert', 'Master'][i] + ')',
+      langBtn: '日本語'
+    }
+  };
+  // 追加言語(日本語・英語以外)。題名はどれも Pawn Pinch + Hasami Shogi
+  const legend = (a, s, c, n, w, x) => a + ' <span class="dot g"></span>' + s + ' <span class="dot r"></span>' + c +
+    ' <span class="dot o"></span>' + n + ' <span class="warn">' + w + '</span> = ' + x;
+  const lvlFmt = (w, names) => i => w + ' ' + i + ' (' + names[i] + ')';
+  Object.assign(I18N, {
+    zh: {
+      title: 'Pawn Pinch', sub: 'Hasami Shogi', level: '强度', turn: '先后手', first: '我先手', second: '我后手',
+      newgame: '新对局', undo: '悔一步', hint: '提示', hintBusy: '思考中…', assist: '辅助', corner: '角落吃子',
+      legend: legend('辅助:', '安全', '可吃子', '新的危险', '橙色框', '现在会被吃的棋子'),
+      cpu: '电脑', me: '你', pieces: '棋子', trayMine: '你吃掉的棋子', trayLost: '被吃掉的棋子',
+      yourTurn: '轮到你了', thinking: '电脑思考中…', over: '对局结束',
+      meCap: n => '✓ 你的一步:吃掉了 ' + n + ' 枚!', meNone: '你的一步:没有吃子',
+      cpuCap: n => '✕ 电脑的一步:你被吃掉了 ' + n + ' 枚', cpuNone: '电脑的一步:没有吃子',
+      win: '你赢了!', lose: '电脑获胜', draw: '平局',
+      subCaptured: '电脑只剩 1 枚或更少棋子。', subLost: '你只剩 1 枚或更少棋子。',
+      subBlocked: '电脑无棋可走。', subBlockedMe: '你无棋可走。',
+      subCapDraw: '已达 ' + MAX_PLIES + ' 步,双方棋子数相同。', subCapCount: '已达 ' + MAX_PLIES + ' 步,按棋子数判定。',
+      again: '再来一局', rulesTitle: '规则',
+      rules: [
+        '你执下方的白色棋子,电脑执上方的黑色棋子。9×9 的棋盘上,双方各 9 枚。',
+        '棋子可沿横向或纵向走任意多个空格,不能越过其他棋子。',
+        '用己方两枚棋子在横向或纵向夹住对方棋子即可吃掉;连成一排的多枚对方棋子也可一次夹住吃掉。',
+        '主动走进对方两枚棋子之间是安全的,不会被吃。',
+        '位于棋盘角落的棋子,当己方占据角落旁边的两个格子时被吃(可用“角落吃子”复选框开关,关闭后角落的棋子不会被吃)。',
+        '把对方压到只剩 1 枚或更少即获胜;无棋可走则判负。',
+        '达到 ' + MAX_PLIES + ' 步后,棋子多的一方获胜(相同则为平局)。'
+      ],
+      footer: '点击自己的棋子,再点击绿色圆点。',
+      lvl: lvlFmt('等级', ['', '入门', '简单', '简单+', '轻松', '普通', '普通+', '较强', '更强', '专家', '大师']),
+      cellFmt: (r, c) => '第' + r + '行第' + c + '列'
+    },
+    ko: {
+      title: 'Pawn Pinch', sub: 'Hasami Shogi', level: '난이도', turn: '순서', first: '내가 먼저', second: '내가 나중',
+      newgame: '새 게임', undo: '무르기', hint: '힌트', hintBusy: '생각 중…', assist: '도움말', corner: '모서리 잡기',
+      legend: legend('도움말:', '안전', '잡을 수 있음', '새로운 위험', '주황 테두리', '지금 잡힐 수 있는 말'),
+      cpu: '컴퓨터', me: '나', pieces: '말', trayMine: '내가 잡은 말', trayLost: '잡힌 내 말',
+      yourTurn: '당신의 차례입니다', thinking: '컴퓨터가 생각 중…', over: '게임 종료',
+      meCap: n => '✓ 내 수: ' + n + '개 잡았습니다!', meNone: '내 수: 잡지 못했습니다',
+      cpuCap: n => '✕ 컴퓨터의 수: ' + n + '개 잡혔습니다', cpuNone: '컴퓨터의 수: 잡히지 않았습니다',
+      win: '당신의 승리!', lose: '컴퓨터의 승리', draw: '무승부',
+      subCaptured: '컴퓨터의 말이 1개 이하가 되었습니다.', subLost: '내 말이 1개 이하가 되었습니다.',
+      subBlocked: '컴퓨터가 움직일 수 있는 말이 없습니다.', subBlockedMe: '움직일 수 있는 말이 없습니다.',
+      subCapDraw: MAX_PLIES + '수에 도달했고 말 수가 같습니다.', subCapCount: MAX_PLIES + '수에 도달하여 말 수로 결정되었습니다.',
+      again: '다시 하기', rulesTitle: '규칙',
+      rules: [
+        '당신은 아래쪽의 흰색 말, 컴퓨터는 위쪽의 검은색 말입니다. 9×9 판에서 각자 9개로 시작합니다.',
+        '말은 가로나 세로로 빈 칸을 원하는 만큼 움직일 수 있으며, 다른 말을 뛰어넘을 수 없습니다.',
+        '상대 말을 가로 또는 세로로 내 말 두 개 사이에 끼우면 잡습니다. 한 줄로 늘어선 여러 개의 상대 말도 한 번에 잡을 수 있습니다.',
+        '스스로 상대 말 두 개 사이로 들어가는 것은 안전하며 잡히지 않습니다.',
+        '모서리에 있는 말은 모서리 옆 두 칸을 모두 내 말로 막으면 잡힙니다("모서리 잡기" 체크로 켜고 끌 수 있으며, 끄면 모서리의 말은 잡히지 않습니다).',
+        '상대 말을 1개 이하로 만들면 승리합니다. 움직일 수 있는 말이 없으면 패배합니다.',
+        MAX_PLIES + '수에 도달하면 말이 더 많은 쪽이 승리합니다(같으면 무승부).'
+      ],
+      footer: '내 말을 누른 뒤 초록색 점을 누르세요.',
+      lvl: lvlFmt('난이도', ['', '입문', '쉬움', '쉬움+', '가벼움', '보통', '보통+', '강함', '더 강함', '전문가', '마스터']),
+      cellFmt: (r, c) => r + '행 ' + c + '열'
+    },
+    es: {
+      title: 'Pawn Pinch', sub: 'Hasami Shogi', level: 'Nivel', turn: 'Turno', first: 'Empiezo yo', second: 'Empieza el ordenador',
+      newgame: 'Nueva partida', undo: 'Deshacer', hint: 'Pista', hintBusy: 'Pensando…', assist: 'Ayuda', corner: 'Captura en esquina',
+      legend: legend('Ayuda:', 'seguro', 'captura', 'nuevo peligro', 'Marco naranja', 'pieza que pueden capturar ahora'),
+      cpu: 'Ordenador', me: 'Tú', pieces: 'Piezas', trayMine: 'Capturadas por ti', trayLost: 'Tus piezas perdidas',
+      yourTurn: 'Tu turno', thinking: 'El ordenador piensa…', over: 'Fin de la partida',
+      meCap: n => '✓ Tu jugada: ¡capturaste ' + n + '!', meNone: 'Tu jugada: sin captura',
+      cpuCap: n => '✕ Jugada del ordenador: perdiste ' + n, cpuNone: 'Jugada del ordenador: sin captura',
+      win: '¡Ganaste!', lose: 'Gana el ordenador', draw: 'Empate',
+      subCaptured: 'Al ordenador le queda una pieza o menos.', subLost: 'Te queda una pieza o menos.',
+      subBlocked: 'El ordenador no tiene movimientos.', subBlockedMe: 'No tienes movimientos.',
+      subCapDraw: 'Se alcanzaron ' + MAX_PLIES + ' jugadas con las mismas piezas.', subCapCount: 'Se alcanzaron ' + MAX_PLIES + ' jugadas; decide el número de piezas.',
+      again: 'Jugar otra vez', rulesTitle: 'Reglas',
+      rules: [
+        'Tú juegas con los peones blancos de abajo y el ordenador con los negros de arriba. Cada bando empieza con 9 piezas en un tablero de 9×9.',
+        'Una pieza se mueve en línea recta, en horizontal o vertical, tantas casillas vacías como quiera. No puede saltar sobre otras piezas.',
+        'Atrapa una pieza enemiga entre dos de las tuyas, en fila o en columna, para capturarla. Una línea de varias piezas enemigas se captura de una vez.',
+        'Colocar una pieza entre dos enemigas es seguro: no te capturan.',
+        'Una pieza en una esquina se captura cuando ocupas las dos casillas contiguas a la esquina. Puedes desactivarlo con la casilla «Captura en esquina».',
+        'Gana quien deje al rival con una pieza o menos. Si no tienes movimientos, pierdes.',
+        'Tras ' + MAX_PLIES + ' jugadas gana quien tenga más piezas (igualdad = empate).'
+      ],
+      footer: 'Toca tu pieza y luego un punto verde.',
+      lvl: lvlFmt('Nivel', ['', 'Principiante', 'Fácil', 'Fácil+', 'Relajado', 'Normal', 'Normal+', 'Fuerte', 'Más fuerte', 'Experto', 'Maestro']),
+      cellFmt: (r, c) => 'fila ' + r + ', columna ' + c
+    },
+    fr: {
+      title: 'Pawn Pinch', sub: 'Hasami Shogi', level: 'Niveau', turn: 'Tour', first: 'Je commence', second: 'L’ordinateur commence',
+      newgame: 'Nouvelle partie', undo: 'Annuler', hint: 'Indice', hintBusy: 'Réflexion…', assist: 'Aide', corner: 'Capture en coin',
+      legend: legend('Aide :', 'sûr', 'capture', 'nouveau danger', 'Cadre orange', 'pièce capturable maintenant'),
+      cpu: 'Ordinateur', me: 'Vous', pieces: 'Pièces', trayMine: 'Capturées par vous', trayLost: 'Vos pièces perdues',
+      yourTurn: 'À vous de jouer', thinking: 'L’ordinateur réfléchit…', over: 'Partie terminée',
+      meCap: n => '✓ Votre coup : ' + n + ' capturée(s) !', meNone: 'Votre coup : aucune capture',
+      cpuCap: n => '✕ Coup de l’ordinateur : vous perdez ' + n, cpuNone: 'Coup de l’ordinateur : aucune capture',
+      win: 'Vous gagnez !', lose: 'L’ordinateur gagne', draw: 'Match nul',
+      subCaptured: 'Il reste une pièce ou moins à l’ordinateur.', subLost: 'Il vous reste une pièce ou moins.',
+      subBlocked: 'L’ordinateur n’a aucun coup légal.', subBlockedMe: 'Vous n’avez aucun coup légal.',
+      subCapDraw: MAX_PLIES + ' coups atteints avec le même nombre de pièces.', subCapCount: MAX_PLIES + ' coups atteints ; le nombre de pièces décide.',
+      again: 'Rejouer', rulesTitle: 'Règles',
+      rules: [
+        'Vous jouez les pions blancs en bas, l’ordinateur les noirs en haut. Chaque camp commence avec 9 pièces sur un plateau de 9×9.',
+        'Une pièce se déplace en ligne droite, horizontalement ou verticalement, d’autant de cases vides que souhaité. Elle ne peut pas sauter par-dessus d’autres pièces.',
+        'Prenez une pièce adverse en la coinçant entre deux de vos pièces, sur une ligne ou une colonne. Plusieurs pièces adverses alignées se capturent en une fois.',
+        'Se placer entre deux pièces adverses est sans danger : vous n’êtes pas capturé.',
+        'Une pièce dans un coin est capturée lorsque vous occupez les deux cases voisines du coin. Vous pouvez désactiver cette règle avec la case « Capture en coin ».',
+        'Réduisez l’adversaire à une pièce ou moins pour gagner. Sans coup légal, vous perdez.',
+        'Après ' + MAX_PLIES + ' coups, le joueur qui a le plus de pièces gagne (égalité = match nul).'
+      ],
+      footer: 'Touchez votre pièce, puis un point vert.',
+      lvl: lvlFmt('Niveau', ['', 'Débutant', 'Facile', 'Facile+', 'Détendu', 'Normal', 'Normal+', 'Fort', 'Plus fort', 'Expert', 'Maître']),
+      cellFmt: (r, c) => 'ligne ' + r + ', colonne ' + c
+    },
+    de: {
+      title: 'Pawn Pinch', sub: 'Hasami Shogi', level: 'Stufe', turn: 'Zug', first: 'Ich beginne', second: 'Computer beginnt',
+      newgame: 'Neues Spiel', undo: 'Zurück', hint: 'Tipp', hintBusy: 'Denke nach…', assist: 'Hilfe', corner: 'Ecken-Schlag',
+      legend: legend('Hilfe:', 'sicher', 'Schlag', 'neue Gefahr', 'Oranger Rahmen', 'kann jetzt geschlagen werden'),
+      cpu: 'Computer', me: 'Du', pieces: 'Steine', trayMine: 'Von dir geschlagen', trayLost: 'Deine verlorenen Steine',
+      yourTurn: 'Du bist dran', thinking: 'Computer denkt nach…', over: 'Spiel beendet',
+      meCap: n => '✓ Dein Zug: ' + n + ' geschlagen!', meNone: 'Dein Zug: nichts geschlagen',
+      cpuCap: n => '✕ Zug des Computers: du verlierst ' + n, cpuNone: 'Zug des Computers: nichts geschlagen',
+      win: 'Du gewinnst!', lose: 'Der Computer gewinnt', draw: 'Unentschieden',
+      subCaptured: 'Der Computer hat nur noch einen Stein oder weniger.', subLost: 'Du hast nur noch einen Stein oder weniger.',
+      subBlocked: 'Der Computer hat keinen gültigen Zug.', subBlockedMe: 'Du hast keinen gültigen Zug.',
+      subCapDraw: MAX_PLIES + ' Züge erreicht, gleich viele Steine.', subCapCount: MAX_PLIES + ' Züge erreicht; die Steinanzahl entscheidet.',
+      again: 'Nochmal spielen', rulesTitle: 'Regeln',
+      rules: [
+        'Du spielst die weißen Bauern unten, der Computer die schwarzen oben. Jede Seite startet mit 9 Steinen auf einem 9×9-Brett.',
+        'Ein Stein zieht geradlinig, waagerecht oder senkrecht, beliebig weit über freie Felder. Er darf keine anderen Steine überspringen.',
+        'Schlage einen gegnerischen Stein, indem du ihn in einer Reihe oder Spalte zwischen zwei eigenen Steinen einklemmst. Mehrere aufgereihte gegnerische Steine werden auf einmal geschlagen.',
+        'Wer sich selbst zwischen zwei gegnerische Steine stellt, ist sicher und wird nicht geschlagen.',
+        'Ein Stein in einer Ecke wird geschlagen, wenn du beide Felder neben der Ecke besetzt hältst. Mit dem Kästchen „Ecken-Schlag“ lässt sich das abschalten.',
+        'Gewonnen hat, wer den Gegner auf einen Stein oder weniger bringt. Ohne gültigen Zug verlierst du.',
+        'Nach ' + MAX_PLIES + ' Zügen gewinnt, wer mehr Steine hat (gleich = Unentschieden).'
+      ],
+      footer: 'Tippe auf deinen Stein, dann auf einen grünen Punkt.',
+      lvl: lvlFmt('Stufe', ['', 'Anfänger', 'Leicht', 'Leicht+', 'Entspannt', 'Normal', 'Normal+', 'Stark', 'Stärker', 'Experte', 'Meister']),
+      cellFmt: (r, c) => 'Zeile ' + r + ', Spalte ' + c
+    }
+  });
+  const EXTRA = {
+    ja: { capBy: w => w + 'が取った駒', subRep: '同じ局面が3回くり返されました。', ruleRep: '同じ局面(手番も同じ)が3回出たら引き分けです。', subStall: n => '駒の取り合いが' + n + '手なかったため、駒数で決まりました。', subStallDraw: n => '駒の取り合いが' + n + '手なく、駒数も同じでした。', ruleStall: '最後に駒を取ってから60手(まだ一度も取っていないときは120手)が過ぎたら、駒数で勝敗を決めます(同数は引き分け)。', pstyle: '駒の形', pSg: '日本の将棋(歩)', pPawn: 'ポーン(チェス風)', pXq: '中国将棋(象棋)', pJg: '韓国将棋(チャンギ)', board: '盤面', bMarble: '大理石', bWood: '将棋盤(木目)', bChecker: 'チェス盤風', demo: 'デモ観戦', demoPause: '一時停止', demoResume: '再開', demoNext: '次のデモ', demoStop: 'デモをやめる', speed: '速さ', spSlow: 'ゆっくり', spNormal: 'ふつう', spFast: 'はやい', demoWhite: '白', demoBlack: '黒', demoWatch: '観戦中:', demoWinW: '白の勝ち', demoWinB: '黒の勝ち', demoSubOne: '片方の駒が残り1枚以下になりました。', demoSubBlocked: '動かせる駒がなくなりました。', demoSubCount: n => n + '手に達し、駒数で決まりました。' },
+    en: { capBy: w => 'Captured by ' + w, subRep: 'The same position occurred three times.', ruleRep: 'If the same position (with the same side to move) occurs three times, the game is a draw.', subStall: n => 'No capture for ' + n + ' moves; decided by piece count.', subStallDraw: n => 'No capture for ' + n + ' moves, and the piece counts are equal.', ruleStall: 'If 60 moves pass since the last capture (120 if nobody has captured yet), the player with more pieces wins (equal = draw).', pstyle: 'Piece style', pSg: 'Shogi (Japanese)', pPawn: 'Pawn', pXq: 'Xiangqi (Chinese)', pJg: 'Janggi (Korean)', board: 'Board', bMarble: 'Marble', bWood: 'Shogi board (wood)', bChecker: 'Chessboard', demo: 'Watch demo', demoPause: 'Pause', demoResume: 'Resume', demoNext: 'Next demo', demoStop: 'Stop demo', speed: 'Speed', spSlow: 'Slow', spNormal: 'Normal', spFast: 'Fast', demoWhite: 'White', demoBlack: 'Black', demoWatch: 'Watching:', demoWinW: 'White wins', demoWinB: 'Black wins', demoSubOne: 'One side is down to one piece or fewer.', demoSubBlocked: 'One side has no legal move.', demoSubCount: n => 'After ' + n + ' moves, decided by piece count.' },
+    zh: { capBy: w => w + '吃掉的棋子', subRep: '同一局面出现了 3 次。', ruleRep: '同一局面(且轮到同一方走)出现 3 次,判为平局。', subStall: n => '已连续 ' + n + ' 步没有吃子,按棋子数判定。', subStallDraw: n => '已连续 ' + n + ' 步没有吃子,且棋子数相同。', ruleStall: '距上次吃子已过 60 步(从未吃子则为 120 步)时,按棋子数判定胜负(相同则为平局)。', pstyle: '棋子样式', pSg: '日本将棋', pPawn: '国际象棋兵', pXq: '中国象棋', pJg: '韩国将棋(장기)', board: '棋盘', bMarble: '大理石', bWood: '将棋盘(木纹)', bChecker: '国际象棋盘', demo: '观看演示', demoPause: '暂停', demoResume: '继续', demoNext: '下一局演示', demoStop: '结束演示', speed: '速度', spSlow: '慢', spNormal: '中', spFast: '快', demoWhite: '白方', demoBlack: '黑方', demoWatch: '观战中:', demoWinW: '白方获胜', demoWinB: '黑方获胜', demoSubOne: '有一方只剩 1 枚或更少棋子。', demoSubBlocked: '有一方无棋可走。', demoSubCount: n => '已达 ' + n + ' 步,按棋子数判定。' },
+    ko: { capBy: w => w + ' 포획한 말', subRep: '같은 상황이 3번 반복되었습니다.', ruleRep: '같은 상황(같은 차례)이 3번 나오면 무승부입니다.', subStall: n => n + '수 동안 잡은 말이 없어 말 수로 결정되었습니다.', subStallDraw: n => n + '수 동안 잡은 말이 없고 말 수도 같습니다.', ruleStall: '마지막으로 말을 잡은 뒤 60수(아직 한 번도 잡지 않았다면 120수)가 지나면 말 수로 승패를 정합니다(같으면 무승부).', pstyle: '말 모양', pSg: '일본 장기(쇼기)', pPawn: '폰(체스)', pXq: '중국 장기(象棋)', pJg: '한국 장기', board: '판', bMarble: '대리석', bWood: '장기판(나무결)', bChecker: '체스판', demo: '데모 관전', demoPause: '일시정지', demoResume: '계속', demoNext: '다음 데모', demoStop: '데모 끝내기', speed: '속도', spSlow: '느리게', spNormal: '보통', spFast: '빠르게', demoWhite: '백', demoBlack: '흑', demoWatch: '관전 중:', demoWinW: '백 승리', demoWinB: '흑 승리', demoSubOne: '한쪽의 말이 1개 이하가 되었습니다.', demoSubBlocked: '한쪽이 움직일 수 있는 말이 없습니다.', demoSubCount: n => n + '수에 도달하여 말 수로 결정되었습니다.' },
+    es: { capBy: w => 'Capturadas por ' + w, subRep: 'La misma posición se repitió tres veces.', ruleRep: 'Si la misma posición (con el mismo turno) se repite tres veces, la partida termina en empate.', subStall: n => 'Sin capturas durante ' + n + ' jugadas; decide el número de piezas.', subStallDraw: n => 'Sin capturas durante ' + n + ' jugadas y con las mismas piezas.', ruleStall: 'Si pasan 60 jugadas desde la última captura (120 si nadie ha capturado aún), gana quien tenga más piezas (igualdad = empate).', pstyle: 'Estilo de piezas', pSg: 'Shogi (Japón)', pPawn: 'Peón', pXq: 'Xiangqi (China)', pJg: 'Janggi (Corea)', board: 'Tablero', bMarble: 'Mármol', bWood: 'Tablero de shogi (madera)', bChecker: 'Tablero de ajedrez', demo: 'Ver demostración', demoPause: 'Pausa', demoResume: 'Continuar', demoNext: 'Siguiente demo', demoStop: 'Salir de la demo', speed: 'Velocidad', spSlow: 'Lenta', spNormal: 'Normal', spFast: 'Rápida', demoWhite: 'Blancas', demoBlack: 'Negras', demoWatch: 'Viendo:', demoWinW: 'Ganan las blancas', demoWinB: 'Ganan las negras', demoSubOne: 'A un bando le queda una pieza o menos.', demoSubBlocked: 'Un bando no tiene movimientos.', demoSubCount: n => 'Tras ' + n + ' jugadas decide el número de piezas.' },
+    fr: { capBy: w => 'Prises par ' + w, subRep: 'La même position s’est répétée trois fois.', ruleRep: 'Si la même position (avec le même trait) apparaît trois fois, la partie est nulle.', subStall: n => 'Aucune capture depuis ' + n + ' coups ; le nombre de pièces décide.', subStallDraw: n => 'Aucune capture depuis ' + n + ' coups et autant de pièces de chaque côté.', ruleStall: 'Si 60 coups passent depuis la dernière capture (120 si personne n’a encore capturé), celui qui a le plus de pièces gagne (égalité = match nul).', pstyle: 'Style des pièces', pSg: 'Shogi (Japon)', pPawn: 'Pion', pXq: 'Xiangqi (Chine)', pJg: 'Janggi (Corée)', board: 'Plateau', bMarble: 'Marbre', bWood: 'Plateau de shogi (bois)', bChecker: 'Échiquier', demo: 'Voir une démo', demoPause: 'Pause', demoResume: 'Reprendre', demoNext: 'Démo suivante', demoStop: 'Arrêter la démo', speed: 'Vitesse', spSlow: 'Lente', spNormal: 'Normale', spFast: 'Rapide', demoWhite: 'Blancs', demoBlack: 'Noirs', demoWatch: 'En cours :', demoWinW: 'Les blancs gagnent', demoWinB: 'Les noirs gagnent', demoSubOne: 'Un camp n’a plus qu’une pièce ou moins.', demoSubBlocked: 'Un camp n’a aucun coup légal.', demoSubCount: n => 'Après ' + n + ' coups, le nombre de pièces décide.' },
+    de: { capBy: w => 'Geschlagen von ' + w, subRep: 'Dieselbe Stellung trat dreimal auf.', ruleRep: 'Tritt dieselbe Stellung (mit demselben Zugrecht) dreimal auf, endet die Partie unentschieden.', subStall: n => 'Seit ' + n + ' Zügen kein Schlag; die Steinanzahl entscheidet.', subStallDraw: n => 'Seit ' + n + ' Zügen kein Schlag und gleich viele Steine.', ruleStall: 'Vergehen 60 Züge seit dem letzten Schlag (120, wenn noch nie geschlagen wurde), gewinnt, wer mehr Steine hat (gleich = Unentschieden).', pstyle: 'Figurenstil', pSg: 'Shogi (Japan)', pPawn: 'Bauer', pXq: 'Xiangqi (China)', pJg: 'Janggi (Korea)', board: 'Brett', bMarble: 'Marmor', bWood: 'Shogi-Brett (Holz)', bChecker: 'Schachbrett', demo: 'Demo ansehen', demoPause: 'Pause', demoResume: 'Weiter', demoNext: 'Nächste Demo', demoStop: 'Demo beenden', speed: 'Tempo', spSlow: 'Langsam', spNormal: 'Normal', spFast: 'Schnell', demoWhite: 'Weiß', demoBlack: 'Schwarz', demoWatch: 'Zuschauen:', demoWinW: 'Weiß gewinnt', demoWinB: 'Schwarz gewinnt', demoSubOne: 'Eine Seite hat nur noch einen Stein oder weniger.', demoSubBlocked: 'Eine Seite hat keinen gültigen Zug.', demoSubCount: n => 'Nach ' + n + ' Zügen entscheidet die Steinanzahl.' }
+  };
+  for (const k of Object.keys(EXTRA)) Object.assign(I18N[k], EXTRA[k]);
+  const LANGS = ['ja', 'en', 'zh', 'ko', 'es', 'fr', 'de'];
+  const guessLang = () => { const n = (navigator.language || 'en').toLowerCase().slice(0, 2); return LANGS.includes(n) ? n : 'en'; };
+  let lang = guessLang();
+  try { const sl = localStorage.getItem('hasami.lang'); if (LANGS.includes(sl)) lang = sl; } catch (e) {}
+  const t = (k, n) => { const v = I18N[lang][k]; return typeof v === 'function' ? v(n) : v; };
+
+  for (let i = 1; i <= 10; i++) {
+    const o = document.createElement('option');
+    o.value = i; levelEl.appendChild(o);
+  }
+  try {
+    const lv = localStorage.getItem('hasami.lv'), sd = localStorage.getItem('hasami.side');
+    if (lv && LV[+lv]) levelEl.value = lv; else levelEl.value = '4';
+    if (sd === 'first' || sd === 'second') sideEl.value = sd;
+  } catch (e) { levelEl.value = '4'; }
+  function save() {
+    try { localStorage.setItem('hasami.lv', levelEl.value); localStorage.setItem('hasami.side', sideEl.value); } catch (e) {}
+  }
+
+  // 駒の形: pawn=チェスのポーン風 / xq=象棋(中国) / jg=チャンギ(韓国)
+  let pieceStyle = 'pawn';
+  const PIECE_SYM = { pawn: { 1: 'pawn', 2: 'pawn' }, xq: { 1: 'xqH', 2: 'xqC' }, jg: { 1: 'jgH', 2: 'jgC' }, sg: { 1: 'sgH', 2: 'sgC' } };
+  const pieceUse = v => '<use href="#' + PIECE_SYM[pieceStyle][v] + '"/>';
+  const pieceSVG = v => '<svg viewBox="0 0 100 100" aria-hidden="true">' + pieceUse(v) + '</svg>';
+
+  for (let i = 0; i < 81; i++) {
+    const el = document.createElement('button');
+    el.type = 'button'; el.className = 'cell'; el.setAttribute('role', 'gridcell');
+    el.addEventListener('click', () => onCell(i));
+    boardEl.appendChild(el); cells.push(el);
+  }
+
+  function applyLang() {
+    document.documentElement.lang = lang;
+    document.title = t('title') + (t('sub') ? ' – ' + t('sub') : '');
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      if (el.id === 'hint' && hintBusy) return;
+      el.textContent = t(el.dataset.i18n);
+    });
+    document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
+    [...levelEl.options].forEach(o => { o.textContent = t('lvl', +o.value); });
+    $('rulesList').innerHTML = I18N[lang].rules.concat(t('ruleRep'), t('ruleStall')).map(s => '<li>' + s + '</li>').join('');
+    $('lang').value = lang;
+    boardEl.setAttribute('aria-label', t('title'));
+  }
+  function cellLabel(i) {
+    const r = ((i / 9) | 0) + 1, c = i % 9 + 1;
+    const f = I18N[lang].cellFmt;
+    if (f) return f(r, c);
+    return lang === 'ja' ? r + '段' + c + '筋' : 'row ' + r + ', column ' + c;
+  }
+
+  // 次にコンピュータが取れる自分の駒
+  function threatened(b0) {
+    const b = Int8Array.from(b0), c = countOf(b), set = new Set();
+    for (const m of genMoves(b, CPU)) {
+      const f = (m / 81) | 0, to = m % 81;
+      const cap = applyMove(b, c, CPU, f, to);
+      for (const i of cap) set.add(i);
+      undoMove(b, c, CPU, f, to, cap);
+    }
+    return set;
+  }
+  // 自分の手 from→to で取れる枚数(gain)と、その手のせいで新たに取られる駒の数(risk)。
+  // すでに狙われている駒(before)は数えない
+  function evalTarget(from, to, before) {
+    const b = Int8Array.from(board), c = countOf(b);
+    const cap = applyMove(b, c, HUMAN, from, to);
+    let risk = 0;
+    if (c[CPU] > 1) for (const i of threatened(b)) if (!before.has(i)) risk++;
+    return { gain: cap.length, risk };
+  }
+
+  function snapshot() {
+    return { board: Int8Array.from(board), turn, plies, last, seen: Object.assign({}, seen), lastCapPly };
+  }
+  function newGame() {
+    clearTimeout(aiTimer);
+    board = newBoard(); cnt = countOf(board);
+    if (demo) {
+      turn = Math.random() < 0.5 ? HUMAN : CPU;
+      demoLv[HUMAN] = 21 + ((Math.random() * 3) | 0); demoLv[CPU] = 21 + ((Math.random() * 3) | 0);
+      openRand = 4 + ((Math.random() * 4) | 0); // 序盤は毎回ちがう展開にするため、数手だけランダムに指す
+      demoPaused = false;
+    } else {
+      turn = sideEl.value === 'first' ? HUMAN : CPU;
+    }
+    over = false; history = []; last = null; selected = null; thinking = false; plies = 0; result = null; noteMe = null; noteCpu = null; hint = null;
+    seen = {}; seen[posKey(board, turn)] = 1; lastCapPly = 0;
+    render();
+    if (demo || turn === CPU) aiTurn();
+  }
+
+  function render(captured) {
+    const tg = new Set(selected != null ? targetsOf(board, selected) : []);
+    const useAssist = assistEl.checked && !demo && !over && !thinking && turn === HUMAN;
+    const thr = useAssist ? threatened(board) : new Set();
+    const info = {};
+    if (useAssist) for (const x of tg) info[x] = evalTarget(selected, x, thr);
+    const tcls = i => { const f = info[i]; return f ? (f.gain ? ' cap' : '') + (f.risk ? ' risk' : '') : ''; };
+    const hcls = i => hint && !over && !thinking ? (i === hint.from ? ' hfrom' : i === hint.to ? ' hto' : '') : '';
+    $('legend').classList.toggle('off', !assistEl.checked || demo);
+    for (let i = 0; i < 81; i++) {
+      const el = cells[i], v = board[i];
+      el.className = 'cell' + (selected === i ? ' sel' : '') + (tg.has(i) ? ' tgt' + tcls(i) : '') + (thr.has(i) ? ' threat' : '') + hcls(i) +
+        (last && (i === last.from || i === last.to) ? ' last' : '') + (last && i === last.to ? ' lastto' : '') +
+        (captured && captured.idx.includes(i) ? (flashUntil[i] = Date.now() + 2200, flashWin[i] = captured.color === CPU && !demo, flashWin[i] ? ' flashwin' : ' flash') : (Date.now() < (flashUntil[i] || 0) ? (flashWin[i] ? ' flashwin' : ' flash') : ''));
+      el.setAttribute('aria-label', cellLabel(i));
+      const pe = el.querySelector('.pw:not(.ghost)');
+      if (!v) { if (pe) pe.remove(); }
+      else if (!pe || +pe.dataset.v !== v || pe.dataset.s !== pieceStyle) {
+        if (pe) pe.remove();
+        const d = document.createElement('div');
+        d.className = 'pw ' + (v === HUMAN ? 'h' : 'c'); d.dataset.v = v; d.dataset.s = pieceStyle;
+        d.innerHTML = pieceSVG(v);
+        el.insertBefore(d, el.firstChild);
+      }
+    }
+    if (captured) for (const k of captured.idx) {
+      const g = document.createElement('div');
+      g.className = 'ghost pw ' + (captured.color === HUMAN ? 'h' : 'c') + (captured.color === CPU && !demo ? ' win' : '');
+      g.innerHTML = pieceSVG(captured.color);
+      cells[k].appendChild(g);
+    }
+    cnt = countOf(board);
+    $('cntMe').textContent = cnt[HUMAN]; $('cntCpu').textContent = cnt[CPU];
+    const tray = (n, cls, prev) => { const pv = cls === 'c' ? CPU : HUMAN; let s = ''; for (let k = 0; k < 8; k++) s += '<span class="mini' + (k < n ? ' on ' + cls : '') + (k < n && k >= prev ? ' pop' : '') + '">' + pieceSVG(pv) + '</span>'; return s; };
+    const gotN = 9 - cnt[CPU], lostN = 9 - cnt[HUMAN];
+    $('trayMine').innerHTML = tray(gotN, 'c', trayPrev.got);
+    $('trayLost').innerHTML = tray(lostN, 'h', trayPrev.lost);
+    trayPrev.got = gotN; trayPrev.lost = lostN;
+    statusEl.className = 'status' + (thinking ? ' think' : '');
+    const turnText = over ? t('over') : thinking ? t('thinking') : (demo ? '' : (turn === HUMAN ? t('yourTurn') : ''));
+    const nl = n => '<div class="note ' + (n ? n.kind : '') + '">' + (n ? t(n.k, n.n) : '&nbsp;') + '</div>';
+    statusEl.innerHTML = nl(noteMe) + nl(noteCpu) + '<div>' + turnText + '</div>';
+    $('undo').disabled = demo || thinking || !history.length;
+    $('hint').disabled = demo || hintBusy;
+    $('demobar').hidden = !demo;
+    $('back').style.display = demo ? 'none' : '';
+    $('again').textContent = demo ? t('demoNext') : t('again');
+    $('demoPause').textContent = demoPaused ? t('demoResume') : t('demoPause');
+    $('trayMineL').textContent = demo ? t('capBy', t('demoWhite')) : t('trayMine');
+    $('trayLostL').textContent = demo ? t('capBy', t('demoBlack')) : t('trayLost');
+    $('icoCpu').innerHTML = pieceUse(CPU); $('icoMe').innerHTML = pieceUse(HUMAN);
+    $('whoCpu').textContent = demo ? t('demoBlack') + ' Lv' + lvShow(demoLv[CPU]) : t('cpu');
+    $('whoMe').textContent = demo ? t('demoWhite') + ' Lv' + lvShow(demoLv[HUMAN]) : t('me');
+    if (demo) $('demoInfo').textContent = t('demoWatch') + ' ' + t('demoWhite') + ' Lv' + lvShow(demoLv[HUMAN]) + ' vs ' + t('demoBlack') + ' Lv' + lvShow(demoLv[CPU]);
+    $('overlay').classList.toggle('show', over);
+    if (over && result) { $('resTitle').textContent = t(result.t); $('resSub').textContent = t(result.s, result.n); }
+  }
+
+  function finishIfNeeded(mover, repeated) {
+    const other = 3 - mover;
+    cnt = countOf(board);
+    const wl = demo ? (mover === HUMAN ? 'demoWinW' : 'demoWinB') : (mover === HUMAN ? 'win' : 'lose');
+    const cap = demo ? DEMO_MAX : MAX_PLIES;
+    let res = null;
+    if (cnt[other] <= 1) res = { t: wl, s: demo ? 'demoSubOne' : (mover === HUMAN ? 'subCaptured' : 'subLost') };
+    else if (!genMoves(board, other).length) res = { t: wl, s: demo ? 'demoSubBlocked' : (mover === HUMAN ? 'subBlocked' : 'subBlockedMe') };
+    else if (repeated) res = { t: 'draw', s: 'subRep' };
+    else if (plies - lastCapPly >= (lastCapPly ? STALL : STALL0)) {
+      // 駒の取り合いが止まった(要塞で守り合っている)ので、駒数で決める
+      const lim = lastCapPly ? STALL : STALL0;
+      if (cnt[HUMAN] === cnt[CPU]) res = { t: 'draw', s: 'subStallDraw', n: lim };
+      else res = { t: cnt[HUMAN] > cnt[CPU] ? (demo ? 'demoWinW' : 'win') : (demo ? 'demoWinB' : 'lose'), s: 'subStall', n: lim };
+    }
+    else if (plies >= cap) {
+      if (cnt[HUMAN] === cnt[CPU]) res = { t: 'draw', s: demo ? 'demoSubCount' : 'subCapDraw', n: cap };
+      else res = { t: cnt[HUMAN] > cnt[CPU] ? (demo ? 'demoWinW' : 'win') : (demo ? 'demoWinB' : 'lose'), s: demo ? 'demoSubCount' : 'subCapCount', n: cap };
+    }
+    if (res) { over = true; result = res; }
+    return over;
+  }
+
+  function play(p, from, to) {
+    const q = 3 - p;
+    const c = countOf(board);
+    const cap = applyMove(board, c, p, from, to);
+    plies++; last = { from, to }; selected = null; hint = null;
+    if (cap.length) lastCapPly = plies;
+    if (demo) { noteMe = null; noteCpu = null; }
+    else if (p === HUMAN) {
+      noteMe = cap.length ? { kind: 'good', k: 'meCap', n: cap.length } : { kind: '', k: 'meNone' };
+    } else {
+      noteCpu = cap.length ? { kind: 'bad', k: 'cpuCap', n: cap.length } : { kind: '', k: 'cpuNone' };
+    }
+    if (cap.length && !demo) { try { if (navigator.vibrate) navigator.vibrate(p === HUMAN ? 40 : [60, 40, 60]); } catch (e) {} }
+    const kq = posKey(board, q); seen[kq] = (seen[kq] || 0) + 1;
+    const ended = finishIfNeeded(p, seen[kq] >= 3);
+    if (!ended) turn = q;
+    render(cap.length ? { idx: cap, color: q } : null);
+    if (!ended && (demo || turn === CPU)) aiTurn();
+  }
+
+  // 次の手番の側(通常はコンピュータ、デモでは両方)に1手指させる
+  function aiTurn() {
+    thinking = true; render();
+    clearTimeout(aiTimer);
+    aiTimer = setTimeout(() => {
+      if (over || (demo && demoPaused)) { thinking = false; render(); return; }
+      const p = turn;
+      let m;
+      if (demo && plies < openRand) { const all = genMoves(board, p); m = all.length ? all[(Math.random() * all.length) | 0] : null; }
+      else m = chooseMove(board, p, demo ? demoLv[p] : +levelEl.value, seen);
+      thinking = false;
+      if (m == null) {
+        over = true;
+        result = demo ? { t: p === CPU ? 'demoWinW' : 'demoWinB', s: 'demoSubBlocked' } : { t: 'win', s: 'subBlocked' };
+        render(); return;
+      }
+      play(p, (m / 81) | 0, m % 81);
+    }, demo ? demoSpeed : 900);
+  }
+  function demoStart() { demo = true; newGame(); }
+  function demoExit() { demo = false; clearTimeout(aiTimer); newGame(); }
+
+  function onCell(i) {
+    if (demo || over || thinking || turn !== HUMAN) return;
+    if (board[i] === HUMAN) {
+      selected = selected === i ? null : (targetsOf(board, i).length ? i : null);
+      render(); return;
+    }
+    if (selected != null && board[i] === 0 && targetsOf(board, selected).includes(i)) {
+      history.push(snapshot());
+      play(HUMAN, selected, i);
+      return;
+    }
+    selected = null; render();
+  }
+
+  function undo() {
+    if (thinking || !history.length) return;
+    const s = history.pop();
+    board = Int8Array.from(s.board); turn = s.turn; plies = s.plies; last = s.last; seen = Object.assign({}, s.seen); lastCapPly = s.lastCapPly || 0;
+    over = false; selected = null; result = null; noteMe = null; noteCpu = null; hint = null;
+    render();
+  }
+
+  $('newgame').addEventListener('click', () => { save(); demo = false; newGame(); });
+  $('again').addEventListener('click', () => { save(); if (demo) demoStart(); else newGame(); });
+  $('demoBtn').addEventListener('click', demoStart);
+  $('demoNextBtn').addEventListener('click', demoStart);
+  $('demoStop').addEventListener('click', demoExit);
+  $('demoPause').addEventListener('click', () => {
+    demoPaused = !demoPaused;
+    render();
+    if (!demoPaused && !over && !thinking) aiTurn();
+  });
+  $('speedSel').addEventListener('change', () => { demoSpeed = +$('speedSel').value; });
+  const pieceSel = $('pieceSel');
+  const setPieces = v => { pieceStyle = v; document.documentElement.dataset.pieces = v; pieceSel.value = v; };
+  setPieces('pawn');
+  try { const ps = localStorage.getItem('hasami.pieces'); if (ps === 'xq' || ps === 'jg' || ps === 'sg' || ps === 'pawn') setPieces(ps); } catch (e) {}
+  pieceSel.addEventListener('change', () => { setPieces(pieceSel.value); try { localStorage.setItem('hasami.pieces', pieceSel.value); } catch (e) {} render(); });
+  const boardSel = $('boardSel');
+  const setBoard = v => { boardEl.dataset.theme = v; boardSel.value = v; };
+  setBoard('marble');
+  try { const bs = localStorage.getItem('hasami.board'); if (bs === 'wood' || bs === 'checker' || bs === 'marble') setBoard(bs); } catch (e) {}
+  boardSel.addEventListener('change', () => { setBoard(boardSel.value); try { localStorage.setItem('hasami.board', boardSel.value); } catch (e) {} });
+  $('undo').addEventListener('click', undo);
+  $('back').addEventListener('click', undo);
+  assistEl.addEventListener('change', () => { try { localStorage.setItem('hasami.assist', assistEl.checked ? '1' : '0'); } catch (e) {} render(); });
+  try { if (localStorage.getItem('hasami.assist') === '0') assistEl.checked = false; } catch (e) {}
+  const cornerEl = $('corner');
+  try { if (localStorage.getItem('hasami.corner') === '0') cornerEl.checked = false; } catch (e) {}
+  cornerRule = cornerEl.checked;
+  cornerEl.addEventListener('change', () => {
+    cornerRule = cornerEl.checked; hint = null;
+    try { localStorage.setItem('hasami.corner', cornerRule ? '1' : '0'); } catch (e) {}
+    render();
+  });
+  $('hint').addEventListener('click', () => {
+    if (demo || over || thinking || hintBusy || turn !== HUMAN) return;
+    hintBusy = true; $('hint').disabled = true; $('hint').textContent = t('hintBusy');
+    setTimeout(() => {
+      const m = chooseMove(board, HUMAN, 11, seen);
+      hintBusy = false; $('hint').disabled = false; $('hint').textContent = t('hint');
+      if (m != null) { hint = { from: (m / 81) | 0, to: m % 81 }; selected = null; }
+      render();
+    }, 30);
+  });
+  $('lang').addEventListener('change', () => {
+    lang = $('lang').value;
+    try { localStorage.setItem('hasami.lang', lang); } catch (e) {}
+    applyLang(); render();
+  });
+  levelEl.addEventListener('change', save);
+  sideEl.addEventListener('change', () => { save(); });
+  window.__hasami = { get board() { return board; }, newGame, get lang() { return lang; }, get turn() { return turn; }, get plies() { return plies; }, set plies(v) { plies = v; }, set lastCapPly(v) { lastCapPly = v; }, get over() { return over; }, play, get seen() { return seen; } };
+  applyLang();
+  newGame();
+})();
+</script>
+</body>
+</html>
