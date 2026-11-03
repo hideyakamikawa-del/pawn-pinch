@@ -30,6 +30,12 @@ h1{font-size:1.35rem;margin:4px 0 10px;text-align:center;letter-spacing:.06em}
 .sub{text-align:center;font-size:.8rem;color:var(--muted);letter-spacing:.22em;margin:-6px 0 10px;text-transform:uppercase}
 .sub:empty{display:none}
 .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;margin-bottom:10px}
+.controls.main{margin-bottom:6px}
+details.settings{margin:0 0 6px;padding:0;border:0;background:none}
+details.settings>summary{cursor:pointer;text-align:center;font-size:.85rem;color:var(--muted);padding:4px;list-style:none}
+details.settings>summary::-webkit-details-marker{display:none}
+details.settings>summary::before{content:"\25B8 "}
+details.settings[open]>summary::before{content:"\25BE "}
 .controls label{font-size:.85rem;color:var(--muted);display:flex;align-items:center;gap:4px}
 select,button.btn{
   font:inherit;font-size:.95rem;padding:7px 10px;border-radius:8px;
@@ -126,7 +132,7 @@ button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
 .tray{display:flex;align-items:center;gap:8px;min-height:36px;padding:2px 2px;font-size:.8rem;color:var(--muted)}
 .tray .tl{white-space:nowrap}
 .tray #trayMine,.tray #trayLost{display:flex;gap:3px;flex-wrap:nowrap;align-items:center}
-.mini{--ms:clamp(22px,7.2vw,30px);width:var(--ms);height:var(--ms);flex:none;--pf:rgba(120,100,60,.14);--ps:rgba(120,100,60,.3);display:block}
+.mini{--ms:clamp(18px,6.2vw,30px);width:var(--ms);height:var(--ms);flex:none;--pf:rgba(120,100,60,.14);--ps:rgba(120,100,60,.3);display:block}
 .mini.pop{animation:pop .5s ease-out}
 @keyframes pop{0%{transform:scale(1.8)}100%{transform:scale(1)}}
 .legend{font-size:.75rem;color:var(--muted);text-align:center;margin:-2px 0 6px;line-height:1.6}
@@ -159,6 +165,7 @@ details{margin-top:16px;background:var(--panel);border:1px solid var(--line);bor
 summary{cursor:pointer;font-weight:600}
 details ul{margin:6px 0 0;padding-left:1.2em}
 footer{margin-top:14px;text-align:center;font-size:.75rem;color:var(--muted)}
+@media (max-width:600px){.status{min-height:4.2em}h1{margin:2px 0 6px}}
 </style>
 </head>
 <body>
@@ -195,6 +202,13 @@ footer{margin-top:14px;text-align:center;font-size:.75rem;color:var(--muted)}
     </select>
   </div>
 
+  <div class="controls main">
+    <button class="btn primary" id="newgame" type="button" data-i18n="newgame">新しい対局</button>
+    <button class="btn" id="undo" type="button" data-i18n="undo">1手戻す</button>
+    <button class="btn" id="hint" type="button" data-i18n="hint">ヒント</button>
+  </div>
+  <details class="settings" id="settings" open>
+    <summary data-i18n="settings">設定</summary>
   <div class="controls">
     <label><span data-i18n="level">強さ</span>
       <select id="level"></select>
@@ -205,9 +219,6 @@ footer{margin-top:14px;text-align:center;font-size:.75rem;color:var(--muted)}
         <option value="second" data-i18n="second">後手</option>
       </select>
     </label>
-    <button class="btn primary" id="newgame" type="button" data-i18n="newgame">新しい対局</button>
-    <button class="btn" id="undo" type="button" data-i18n="undo">1手戻す</button>
-    <button class="btn" id="hint" type="button" data-i18n="hint">ヒント</button>
     <label><input type="checkbox" id="assist" checked> <span data-i18n="assist">アシスト</span></label>
     <label><input type="checkbox" id="corner" checked> <span data-i18n="corner">角取りあり</span></label>
     <label><span data-i18n="board">盤面</span>
@@ -227,6 +238,8 @@ footer{margin-top:14px;text-align:center;font-size:.75rem;color:var(--muted)}
     </label>
     <button class="btn" id="demoBtn" type="button" data-i18n="demo">デモ観戦</button>
   </div>
+  <div class="legend" id="legend" data-i18n-html="legend"></div>
+  </details>
   <div class="demobar" id="demobar" hidden>
     <div id="demoInfo"></div>
     <button class="btn" id="demoPause" type="button" data-i18n="demoPause">一時停止</button>
@@ -240,7 +253,6 @@ footer{margin-top:14px;text-align:center;font-size:.75rem;color:var(--muted)}
     </label>
     <button class="btn" id="demoStop" type="button" data-i18n="demoStop">デモをやめる</button>
   </div>
-  <div class="legend" id="legend" data-i18n-html="legend"></div>
 
   <div class="side">
     <span class="who"><svg class="ico c" id="icoCpu" aria-hidden="true"><use href="#pawn"/></svg><span data-i18n="cpu" id="whoCpu">コンピュータ</span></span>
@@ -669,13 +681,13 @@ function chooseMove(board, p, level, seen) {
     }
   });
   const EXTRA = {
-    ja: { capBy: w => w + 'が取った駒', subRep: '同じ局面が3回くり返されました。', ruleRep: '同じ局面(手番も同じ)が3回出たら引き分けです。', subStall: n => '駒の取り合いが' + n + '手なかったため、駒数で決まりました。', subStallDraw: n => '駒の取り合いが' + n + '手なく、駒数も同じでした。', ruleStall: '最後に駒を取ってから60手(まだ一度も取っていないときは120手)が過ぎたら、駒数で勝敗を決めます(同数は引き分け)。', pstyle: '駒の形', pSg: '日本の将棋(歩)', pPawn: 'ポーン(チェス風)', pXq: '中国将棋(象棋)', pJg: '韓国将棋(チャンギ)', board: '盤面', bMarble: '大理石', bWood: '将棋盤(木目)', bChecker: 'チェス盤風', demo: 'デモ観戦', demoPause: '一時停止', demoResume: '再開', demoNext: '次のデモ', demoStop: 'デモをやめる', speed: '速さ', spSlow: 'ゆっくり', spNormal: 'ふつう', spFast: 'はやい', demoWhite: '白', demoBlack: '黒', demoWatch: '観戦中:', demoWinW: '白の勝ち', demoWinB: '黒の勝ち', demoSubOne: '片方の駒が残り1枚以下になりました。', demoSubBlocked: '動かせる駒がなくなりました。', demoSubCount: n => n + '手に達し、駒数で決まりました。' },
-    en: { capBy: w => 'Captured by ' + w, subRep: 'The same position occurred three times.', ruleRep: 'If the same position (with the same side to move) occurs three times, the game is a draw.', subStall: n => 'No capture for ' + n + ' moves; decided by piece count.', subStallDraw: n => 'No capture for ' + n + ' moves, and the piece counts are equal.', ruleStall: 'If 60 moves pass since the last capture (120 if nobody has captured yet), the player with more pieces wins (equal = draw).', pstyle: 'Piece style', pSg: 'Shogi (Japanese)', pPawn: 'Pawn', pXq: 'Xiangqi (Chinese)', pJg: 'Janggi (Korean)', board: 'Board', bMarble: 'Marble', bWood: 'Shogi board (wood)', bChecker: 'Chessboard', demo: 'Watch demo', demoPause: 'Pause', demoResume: 'Resume', demoNext: 'Next demo', demoStop: 'Stop demo', speed: 'Speed', spSlow: 'Slow', spNormal: 'Normal', spFast: 'Fast', demoWhite: 'White', demoBlack: 'Black', demoWatch: 'Watching:', demoWinW: 'White wins', demoWinB: 'Black wins', demoSubOne: 'One side is down to one piece or fewer.', demoSubBlocked: 'One side has no legal move.', demoSubCount: n => 'After ' + n + ' moves, decided by piece count.' },
-    zh: { capBy: w => w + '吃掉的棋子', subRep: '同一局面出现了 3 次。', ruleRep: '同一局面(且轮到同一方走)出现 3 次,判为平局。', subStall: n => '已连续 ' + n + ' 步没有吃子,按棋子数判定。', subStallDraw: n => '已连续 ' + n + ' 步没有吃子,且棋子数相同。', ruleStall: '距上次吃子已过 60 步(从未吃子则为 120 步)时,按棋子数判定胜负(相同则为平局)。', pstyle: '棋子样式', pSg: '日本将棋', pPawn: '国际象棋兵', pXq: '中国象棋', pJg: '韩国将棋(장기)', board: '棋盘', bMarble: '大理石', bWood: '将棋盘(木纹)', bChecker: '国际象棋盘', demo: '观看演示', demoPause: '暂停', demoResume: '继续', demoNext: '下一局演示', demoStop: '结束演示', speed: '速度', spSlow: '慢', spNormal: '中', spFast: '快', demoWhite: '白方', demoBlack: '黑方', demoWatch: '观战中:', demoWinW: '白方获胜', demoWinB: '黑方获胜', demoSubOne: '有一方只剩 1 枚或更少棋子。', demoSubBlocked: '有一方无棋可走。', demoSubCount: n => '已达 ' + n + ' 步,按棋子数判定。' },
-    ko: { capBy: w => w + ' 포획한 말', subRep: '같은 상황이 3번 반복되었습니다.', ruleRep: '같은 상황(같은 차례)이 3번 나오면 무승부입니다.', subStall: n => n + '수 동안 잡은 말이 없어 말 수로 결정되었습니다.', subStallDraw: n => n + '수 동안 잡은 말이 없고 말 수도 같습니다.', ruleStall: '마지막으로 말을 잡은 뒤 60수(아직 한 번도 잡지 않았다면 120수)가 지나면 말 수로 승패를 정합니다(같으면 무승부).', pstyle: '말 모양', pSg: '일본 장기(쇼기)', pPawn: '폰(체스)', pXq: '중국 장기(象棋)', pJg: '한국 장기', board: '판', bMarble: '대리석', bWood: '장기판(나무결)', bChecker: '체스판', demo: '데모 관전', demoPause: '일시정지', demoResume: '계속', demoNext: '다음 데모', demoStop: '데모 끝내기', speed: '속도', spSlow: '느리게', spNormal: '보통', spFast: '빠르게', demoWhite: '백', demoBlack: '흑', demoWatch: '관전 중:', demoWinW: '백 승리', demoWinB: '흑 승리', demoSubOne: '한쪽의 말이 1개 이하가 되었습니다.', demoSubBlocked: '한쪽이 움직일 수 있는 말이 없습니다.', demoSubCount: n => n + '수에 도달하여 말 수로 결정되었습니다.' },
-    es: { capBy: w => 'Capturadas por ' + w, subRep: 'La misma posición se repitió tres veces.', ruleRep: 'Si la misma posición (con el mismo turno) se repite tres veces, la partida termina en empate.', subStall: n => 'Sin capturas durante ' + n + ' jugadas; decide el número de piezas.', subStallDraw: n => 'Sin capturas durante ' + n + ' jugadas y con las mismas piezas.', ruleStall: 'Si pasan 60 jugadas desde la última captura (120 si nadie ha capturado aún), gana quien tenga más piezas (igualdad = empate).', pstyle: 'Estilo de piezas', pSg: 'Shogi (Japón)', pPawn: 'Peón', pXq: 'Xiangqi (China)', pJg: 'Janggi (Corea)', board: 'Tablero', bMarble: 'Mármol', bWood: 'Tablero de shogi (madera)', bChecker: 'Tablero de ajedrez', demo: 'Ver demostración', demoPause: 'Pausa', demoResume: 'Continuar', demoNext: 'Siguiente demo', demoStop: 'Salir de la demo', speed: 'Velocidad', spSlow: 'Lenta', spNormal: 'Normal', spFast: 'Rápida', demoWhite: 'Blancas', demoBlack: 'Negras', demoWatch: 'Viendo:', demoWinW: 'Ganan las blancas', demoWinB: 'Ganan las negras', demoSubOne: 'A un bando le queda una pieza o menos.', demoSubBlocked: 'Un bando no tiene movimientos.', demoSubCount: n => 'Tras ' + n + ' jugadas decide el número de piezas.' },
-    fr: { capBy: w => 'Prises par ' + w, subRep: 'La même position s’est répétée trois fois.', ruleRep: 'Si la même position (avec le même trait) apparaît trois fois, la partie est nulle.', subStall: n => 'Aucune capture depuis ' + n + ' coups ; le nombre de pièces décide.', subStallDraw: n => 'Aucune capture depuis ' + n + ' coups et autant de pièces de chaque côté.', ruleStall: 'Si 60 coups passent depuis la dernière capture (120 si personne n’a encore capturé), celui qui a le plus de pièces gagne (égalité = match nul).', pstyle: 'Style des pièces', pSg: 'Shogi (Japon)', pPawn: 'Pion', pXq: 'Xiangqi (Chine)', pJg: 'Janggi (Corée)', board: 'Plateau', bMarble: 'Marbre', bWood: 'Plateau de shogi (bois)', bChecker: 'Échiquier', demo: 'Voir une démo', demoPause: 'Pause', demoResume: 'Reprendre', demoNext: 'Démo suivante', demoStop: 'Arrêter la démo', speed: 'Vitesse', spSlow: 'Lente', spNormal: 'Normale', spFast: 'Rapide', demoWhite: 'Blancs', demoBlack: 'Noirs', demoWatch: 'En cours :', demoWinW: 'Les blancs gagnent', demoWinB: 'Les noirs gagnent', demoSubOne: 'Un camp n’a plus qu’une pièce ou moins.', demoSubBlocked: 'Un camp n’a aucun coup légal.', demoSubCount: n => 'Après ' + n + ' coups, le nombre de pièces décide.' },
-    de: { capBy: w => 'Geschlagen von ' + w, subRep: 'Dieselbe Stellung trat dreimal auf.', ruleRep: 'Tritt dieselbe Stellung (mit demselben Zugrecht) dreimal auf, endet die Partie unentschieden.', subStall: n => 'Seit ' + n + ' Zügen kein Schlag; die Steinanzahl entscheidet.', subStallDraw: n => 'Seit ' + n + ' Zügen kein Schlag und gleich viele Steine.', ruleStall: 'Vergehen 60 Züge seit dem letzten Schlag (120, wenn noch nie geschlagen wurde), gewinnt, wer mehr Steine hat (gleich = Unentschieden).', pstyle: 'Figurenstil', pSg: 'Shogi (Japan)', pPawn: 'Bauer', pXq: 'Xiangqi (China)', pJg: 'Janggi (Korea)', board: 'Brett', bMarble: 'Marmor', bWood: 'Shogi-Brett (Holz)', bChecker: 'Schachbrett', demo: 'Demo ansehen', demoPause: 'Pause', demoResume: 'Weiter', demoNext: 'Nächste Demo', demoStop: 'Demo beenden', speed: 'Tempo', spSlow: 'Langsam', spNormal: 'Normal', spFast: 'Schnell', demoWhite: 'Weiß', demoBlack: 'Schwarz', demoWatch: 'Zuschauen:', demoWinW: 'Weiß gewinnt', demoWinB: 'Schwarz gewinnt', demoSubOne: 'Eine Seite hat nur noch einen Stein oder weniger.', demoSubBlocked: 'Eine Seite hat keinen gültigen Zug.', demoSubCount: n => 'Nach ' + n + ' Zügen entscheidet die Steinanzahl.' }
+    ja: { settings: '設定', capBy: w => w + 'が取った駒', subRep: '同じ局面が3回くり返されました。', ruleRep: '同じ局面(手番も同じ)が3回出たら引き分けです。', subStall: n => '駒の取り合いが' + n + '手なかったため、駒数で決まりました。', subStallDraw: n => '駒の取り合いが' + n + '手なく、駒数も同じでした。', ruleStall: '最後に駒を取ってから60手(まだ一度も取っていないときは120手)が過ぎたら、駒数で勝敗を決めます(同数は引き分け)。', pstyle: '駒の形', pSg: '日本の将棋(歩)', pPawn: 'ポーン(チェス風)', pXq: '中国将棋(象棋)', pJg: '韓国将棋(チャンギ)', board: '盤面', bMarble: '大理石', bWood: '将棋盤(木目)', bChecker: 'チェス盤風', demo: 'デモ観戦', demoPause: '一時停止', demoResume: '再開', demoNext: '次のデモ', demoStop: 'デモをやめる', speed: '速さ', spSlow: 'ゆっくり', spNormal: 'ふつう', spFast: 'はやい', demoWhite: '白', demoBlack: '黒', demoWatch: '観戦中:', demoWinW: '白の勝ち', demoWinB: '黒の勝ち', demoSubOne: '片方の駒が残り1枚以下になりました。', demoSubBlocked: '動かせる駒がなくなりました。', demoSubCount: n => n + '手に達し、駒数で決まりました。' },
+    en: { settings: 'Settings', capBy: w => 'Captured by ' + w, subRep: 'The same position occurred three times.', ruleRep: 'If the same position (with the same side to move) occurs three times, the game is a draw.', subStall: n => 'No capture for ' + n + ' moves; decided by piece count.', subStallDraw: n => 'No capture for ' + n + ' moves, and the piece counts are equal.', ruleStall: 'If 60 moves pass since the last capture (120 if nobody has captured yet), the player with more pieces wins (equal = draw).', pstyle: 'Piece style', pSg: 'Shogi (Japanese)', pPawn: 'Pawn', pXq: 'Xiangqi (Chinese)', pJg: 'Janggi (Korean)', board: 'Board', bMarble: 'Marble', bWood: 'Shogi board (wood)', bChecker: 'Chessboard', demo: 'Watch demo', demoPause: 'Pause', demoResume: 'Resume', demoNext: 'Next demo', demoStop: 'Stop demo', speed: 'Speed', spSlow: 'Slow', spNormal: 'Normal', spFast: 'Fast', demoWhite: 'White', demoBlack: 'Black', demoWatch: 'Watching:', demoWinW: 'White wins', demoWinB: 'Black wins', demoSubOne: 'One side is down to one piece or fewer.', demoSubBlocked: 'One side has no legal move.', demoSubCount: n => 'After ' + n + ' moves, decided by piece count.' },
+    zh: { settings: '设置', capBy: w => w + '吃掉的棋子', subRep: '同一局面出现了 3 次。', ruleRep: '同一局面(且轮到同一方走)出现 3 次,判为平局。', subStall: n => '已连续 ' + n + ' 步没有吃子,按棋子数判定。', subStallDraw: n => '已连续 ' + n + ' 步没有吃子,且棋子数相同。', ruleStall: '距上次吃子已过 60 步(从未吃子则为 120 步)时,按棋子数判定胜负(相同则为平局)。', pstyle: '棋子样式', pSg: '日本将棋', pPawn: '国际象棋兵', pXq: '中国象棋', pJg: '韩国将棋(장기)', board: '棋盘', bMarble: '大理石', bWood: '将棋盘(木纹)', bChecker: '国际象棋盘', demo: '观看演示', demoPause: '暂停', demoResume: '继续', demoNext: '下一局演示', demoStop: '结束演示', speed: '速度', spSlow: '慢', spNormal: '中', spFast: '快', demoWhite: '白方', demoBlack: '黑方', demoWatch: '观战中:', demoWinW: '白方获胜', demoWinB: '黑方获胜', demoSubOne: '有一方只剩 1 枚或更少棋子。', demoSubBlocked: '有一方无棋可走。', demoSubCount: n => '已达 ' + n + ' 步,按棋子数判定。' },
+    ko: { settings: '설정', capBy: w => w + ' 포획한 말', subRep: '같은 상황이 3번 반복되었습니다.', ruleRep: '같은 상황(같은 차례)이 3번 나오면 무승부입니다.', subStall: n => n + '수 동안 잡은 말이 없어 말 수로 결정되었습니다.', subStallDraw: n => n + '수 동안 잡은 말이 없고 말 수도 같습니다.', ruleStall: '마지막으로 말을 잡은 뒤 60수(아직 한 번도 잡지 않았다면 120수)가 지나면 말 수로 승패를 정합니다(같으면 무승부).', pstyle: '말 모양', pSg: '일본 장기(쇼기)', pPawn: '폰(체스)', pXq: '중국 장기(象棋)', pJg: '한국 장기', board: '판', bMarble: '대리석', bWood: '장기판(나무결)', bChecker: '체스판', demo: '데모 관전', demoPause: '일시정지', demoResume: '계속', demoNext: '다음 데모', demoStop: '데모 끝내기', speed: '속도', spSlow: '느리게', spNormal: '보통', spFast: '빠르게', demoWhite: '백', demoBlack: '흑', demoWatch: '관전 중:', demoWinW: '백 승리', demoWinB: '흑 승리', demoSubOne: '한쪽의 말이 1개 이하가 되었습니다.', demoSubBlocked: '한쪽이 움직일 수 있는 말이 없습니다.', demoSubCount: n => n + '수에 도달하여 말 수로 결정되었습니다.' },
+    es: { settings: 'Ajustes', capBy: w => 'Capturadas por ' + w, subRep: 'La misma posición se repitió tres veces.', ruleRep: 'Si la misma posición (con el mismo turno) se repite tres veces, la partida termina en empate.', subStall: n => 'Sin capturas durante ' + n + ' jugadas; decide el número de piezas.', subStallDraw: n => 'Sin capturas durante ' + n + ' jugadas y con las mismas piezas.', ruleStall: 'Si pasan 60 jugadas desde la última captura (120 si nadie ha capturado aún), gana quien tenga más piezas (igualdad = empate).', pstyle: 'Estilo de piezas', pSg: 'Shogi (Japón)', pPawn: 'Peón', pXq: 'Xiangqi (China)', pJg: 'Janggi (Corea)', board: 'Tablero', bMarble: 'Mármol', bWood: 'Tablero de shogi (madera)', bChecker: 'Tablero de ajedrez', demo: 'Ver demostración', demoPause: 'Pausa', demoResume: 'Continuar', demoNext: 'Siguiente demo', demoStop: 'Salir de la demo', speed: 'Velocidad', spSlow: 'Lenta', spNormal: 'Normal', spFast: 'Rápida', demoWhite: 'Blancas', demoBlack: 'Negras', demoWatch: 'Viendo:', demoWinW: 'Ganan las blancas', demoWinB: 'Ganan las negras', demoSubOne: 'A un bando le queda una pieza o menos.', demoSubBlocked: 'Un bando no tiene movimientos.', demoSubCount: n => 'Tras ' + n + ' jugadas decide el número de piezas.' },
+    fr: { settings: 'Réglages', capBy: w => 'Prises par ' + w, subRep: 'La même position s’est répétée trois fois.', ruleRep: 'Si la même position (avec le même trait) apparaît trois fois, la partie est nulle.', subStall: n => 'Aucune capture depuis ' + n + ' coups ; le nombre de pièces décide.', subStallDraw: n => 'Aucune capture depuis ' + n + ' coups et autant de pièces de chaque côté.', ruleStall: 'Si 60 coups passent depuis la dernière capture (120 si personne n’a encore capturé), celui qui a le plus de pièces gagne (égalité = match nul).', pstyle: 'Style des pièces', pSg: 'Shogi (Japon)', pPawn: 'Pion', pXq: 'Xiangqi (Chine)', pJg: 'Janggi (Corée)', board: 'Plateau', bMarble: 'Marbre', bWood: 'Plateau de shogi (bois)', bChecker: 'Échiquier', demo: 'Voir une démo', demoPause: 'Pause', demoResume: 'Reprendre', demoNext: 'Démo suivante', demoStop: 'Arrêter la démo', speed: 'Vitesse', spSlow: 'Lente', spNormal: 'Normale', spFast: 'Rapide', demoWhite: 'Blancs', demoBlack: 'Noirs', demoWatch: 'En cours :', demoWinW: 'Les blancs gagnent', demoWinB: 'Les noirs gagnent', demoSubOne: 'Un camp n’a plus qu’une pièce ou moins.', demoSubBlocked: 'Un camp n’a aucun coup légal.', demoSubCount: n => 'Après ' + n + ' coups, le nombre de pièces décide.' },
+    de: { settings: 'Einstellungen', capBy: w => 'Geschlagen von ' + w, subRep: 'Dieselbe Stellung trat dreimal auf.', ruleRep: 'Tritt dieselbe Stellung (mit demselben Zugrecht) dreimal auf, endet die Partie unentschieden.', subStall: n => 'Seit ' + n + ' Zügen kein Schlag; die Steinanzahl entscheidet.', subStallDraw: n => 'Seit ' + n + ' Zügen kein Schlag und gleich viele Steine.', ruleStall: 'Vergehen 60 Züge seit dem letzten Schlag (120, wenn noch nie geschlagen wurde), gewinnt, wer mehr Steine hat (gleich = Unentschieden).', pstyle: 'Figurenstil', pSg: 'Shogi (Japan)', pPawn: 'Bauer', pXq: 'Xiangqi (China)', pJg: 'Janggi (Korea)', board: 'Brett', bMarble: 'Marmor', bWood: 'Shogi-Brett (Holz)', bChecker: 'Schachbrett', demo: 'Demo ansehen', demoPause: 'Pause', demoResume: 'Weiter', demoNext: 'Nächste Demo', demoStop: 'Demo beenden', speed: 'Tempo', spSlow: 'Langsam', spNormal: 'Normal', spFast: 'Schnell', demoWhite: 'Weiß', demoBlack: 'Schwarz', demoWatch: 'Zuschauen:', demoWinW: 'Weiß gewinnt', demoWinB: 'Schwarz gewinnt', demoSubOne: 'Eine Seite hat nur noch einen Stein oder weniger.', demoSubBlocked: 'Eine Seite hat keinen gültigen Zug.', demoSubCount: n => 'Nach ' + n + ' Zügen entscheidet die Steinanzahl.' }
   };
   for (const k of Object.keys(EXTRA)) Object.assign(I18N[k], EXTRA[k]);
   const LANGS = ['ja', 'en', 'zh', 'ko', 'es', 'fr', 'de'];
@@ -918,6 +930,7 @@ function chooseMove(board, p, level, seen) {
 
   $('newgame').addEventListener('click', () => { save(); demo = false; newGame(); });
   $('again').addEventListener('click', () => { save(); if (demo) demoStart(); else newGame(); });
+  try { if (window.matchMedia('(max-width:600px)').matches) $('settings').open = false; } catch (e) {}
   $('demoBtn').addEventListener('click', demoStart);
   $('demoNextBtn').addEventListener('click', demoStart);
   $('demoStop').addEventListener('click', demoExit);
