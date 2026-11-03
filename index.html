@@ -710,7 +710,7 @@ function chooseMove(board, p, level, seen) {
   }
 
   // 駒の形: pawn=チェスのポーン風 / xq=象棋(中国) / jg=チャンギ(韓国)
-  let pieceStyle = 'pawn';
+  let pieceStyle = 'sg';
   const PIECE_SYM = { pawn: { 1: 'pawn', 2: 'pawn' }, xq: { 1: 'xqH', 2: 'xqC' }, jg: { 1: 'jgH', 2: 'jgC' }, sg: { 1: 'sgH', 2: 'sgC' } };
   const pieceUse = v => '<use href="#' + PIECE_SYM[pieceStyle][v] + '"/>';
   const pieceSVG = v => '<svg viewBox="0 0 100 100" aria-hidden="true">' + pieceUse(v) + '</svg>';
@@ -942,7 +942,7 @@ function chooseMove(board, p, level, seen) {
   $('speedSel').addEventListener('change', () => { demoSpeed = +$('speedSel').value; });
   const pieceSel = $('pieceSel');
   const setPieces = v => { pieceStyle = v; document.documentElement.dataset.pieces = v; pieceSel.value = v; };
-  setPieces('pawn');
+  setPieces('sg');
   try { const ps = localStorage.getItem('hasami.pieces'); if (ps === 'xq' || ps === 'jg' || ps === 'sg' || ps === 'pawn') setPieces(ps); } catch (e) {}
   pieceSel.addEventListener('change', () => { setPieces(pieceSel.value); try { localStorage.setItem('hasami.pieces', pieceSel.value); } catch (e) {} render(); });
   const boardSel = $('boardSel');
